@@ -1,4 +1,4 @@
-# Chibi Icons for Fabby AI
+# Chibi Icons for Fabbie AI
 
 This folder contains chibi-style icons that represent different moods/states of the AI assistant.
 

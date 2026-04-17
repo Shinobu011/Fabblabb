@@ -1952,7 +1952,7 @@ const generateChatHistoryText = (chatHistory, userInfo) => {
 
     const messages = chatHistory.messages || [];
     messages.forEach((msg, index) => {
-        const role = msg.role === 'user' ? 'User' : 'Fabby';
+        const role = msg.role === 'user' ? 'User' : 'Fabbie';
         const timestamp = new Date(msg.timestamp || Date.now()).toLocaleString();
 
         text += `[${timestamp}] ${role}:\n`;
@@ -2030,7 +2030,7 @@ const sendChatHistoryToDiscord = async (chatHistory, userInfo) => {
 
         // Create embed message
         const embed = {
-            title: '💬 Chat History - Fabby',
+            title: '💬 Chat History - Fabbie',
             description: description,
             color: 0x3498db, // Blue
             footer: {
@@ -2423,8 +2423,8 @@ function generateScheduleHTML(bookings) {
                     ${!day.isClosed ? `<button class="screenshot-btn no-print" onclick="screenshotDay(${index})" title="Screenshot this day">📷 Screenshot</button>` : ''}
                 </div>
                 ${day.isClosed ?
-                    '<p class="closed">CLOSED</p>' :
-                    `<table>
+            '<p class="closed">CLOSED</p>' :
+            `<table>
                         <thead>
                             <tr>
                                 <th>Time Slot</th>
@@ -2444,7 +2444,7 @@ function generateScheduleHTML(bookings) {
                             `).join('')}
                         </tbody>
                     </table>`
-                }
+        }
             </div>
         `).join('')}
         <div class="footer">
@@ -2504,6 +2504,197 @@ app.get('/api/bookings-schedule', (req, res) => {
     } catch (err) {
         console.error('Error generating schedule:', err);
         res.status(500).send('Error generating schedule: ' + err.message);
+    }
+});
+
+// AI Chat Start-to-Finish Endpoints
+app.post('/api/ai-chat-save', async (req, res) => {
+    try {
+        const { chat, userEmail } = req.body;
+        if (!chat || !chat.id || !userEmail) {
+            return res.status(400).json({ error: 'Chat data and user email are required' });
+        }
+
+        // Sanitize email for filesystem
+        const sanitizedEmail = userEmail.replace(/[@.]/g, '_');
+        const chatHistoriesDir = path.join(__dirname, 'db', 'chat_histories', sanitizedEmail);
+
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(chatHistoriesDir)) {
+            fs.mkdirSync(chatHistoriesDir, { recursive: true });
+        }
+
+        // Save chat as individual file
+        const filePath = path.join(chatHistoriesDir, `${chat.id}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(chat, null, 2), 'utf-8');
+
+        return res.json({
+            success: true,
+            message: 'Chat saved successfully',
+            chatId: chat.id
+        });
+    } catch (error) {
+        console.error('Error saving chat:', error);
+        return res.status(500).json({ error: 'Failed to save chat' });
+    }
+});
+
+app.get('/api/ai-chat-load', async (req, res) => {
+    try {
+        const userEmail = req.query.userEmail;
+        if (!userEmail) {
+            return res.status(400).json({ error: 'User email is required' });
+        }
+
+        // Sanitize email for filesystem
+        const sanitizedEmail = userEmail.replace(/[@.]/g, '_');
+        const chatHistoriesDir = path.join(__dirname, 'db', 'chat_histories', sanitizedEmail);
+
+        if (!fs.existsSync(chatHistoriesDir)) {
+            return res.json({ success: true, chats: [] });
+        }
+
+        const files = fs.readdirSync(chatHistoriesDir);
+        const chats = [];
+
+        for (const file of files) {
+            if (!file.endsWith('.json')) continue;
+            const filePath = path.join(chatHistoriesDir, file);
+            try {
+                const fileContent = fs.readFileSync(filePath, 'utf-8');
+                const chat = JSON.parse(fileContent);
+                if (chat.id && chat.messages && Array.isArray(chat.messages)) {
+                    chats.push(chat);
+                }
+            } catch (error) {
+                console.error(`Error reading chat file ${file}:`, error);
+            }
+        }
+
+        // Sort by lastActivity (most recent first)
+        chats.sort((a, b) => {
+            const timeA = b.lastActivity || b.createdAt || 0;
+            const timeB = a.lastActivity || a.createdAt || 0;
+            return timeA - timeB;
+        });
+
+        return res.json({ success: true, chats });
+    } catch (error) {
+        console.error('Error loading chats:', error);
+        return res.status(500).json({ error: 'Failed to load chats' });
+    }
+});
+
+app.delete('/api/ai-chat-save', async (req, res) => {
+    try {
+        const { chatId, userEmail } = req.body;
+        if (!chatId || !userEmail) {
+            return res.status(400).json({ error: 'Chat ID and user email are required' });
+        }
+
+        const sanitizedEmail = userEmail.replace(/[@.]/g, '_');
+        const chatHistoriesDir = path.join(__dirname, 'db', 'chat_histories', sanitizedEmail);
+        const filePath = path.join(chatHistoriesDir, `${chatId}.json`);
+
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            return res.json({ success: true, message: 'Chat deleted successfully' });
+        } else {
+            return res.json({ success: true, message: 'Chat file not found (already deleted)' });
+        }
+    } catch (error) {
+        console.error('Error deleting chat file:', error);
+        return res.status(500).json({ error: 'Failed to delete chat file' });
+    }
+});
+
+app.post('/api/ai-chat-cleanup', async (req, res) => {
+    try {
+        const { userEmail, inactivityTimeout } = req.body;
+        if (!userEmail || !inactivityTimeout || typeof inactivityTimeout !== 'number') {
+            return res.status(400).json({ error: 'User email and valid inactivity timeout are required' });
+        }
+
+        const sanitizedEmail = userEmail.replace(/[@.]/g, '_');
+        const chatHistoriesDir = path.join(__dirname, 'db', 'chat_histories', sanitizedEmail);
+        
+        if (!fs.existsSync(chatHistoriesDir)) {
+            return res.json({ success: true, message: 'No chat directory found', deletedCount: 0 });
+        }
+
+        const currentTime = Date.now();
+        const files = fs.readdirSync(chatHistoriesDir);
+        let deletedCount = 0;
+
+        for (const file of files) {
+            if (!file.endsWith('.json')) continue;
+            const filePath = path.join(chatHistoriesDir, file);
+            try {
+                const fileContent = fs.readFileSync(filePath, 'utf-8');
+                const chat = JSON.parse(fileContent);
+                const timeSinceLastActivity = currentTime - (chat.lastActivity || chat.createdAt || chat.startTime || 0);
+                if (timeSinceLastActivity >= inactivityTimeout) {
+                    fs.unlinkSync(filePath);
+                    deletedCount++;
+                }
+            } catch (error) {
+                console.error(`Error processing chat file ${file}:`, error);
+                // If corrupted, delete it
+                try { fs.unlinkSync(filePath); deletedCount++; } catch(e) {}
+            }
+        }
+
+        return res.json({ success: true, message: `Cleaned up ${deletedCount} expired chat files`, deletedCount });
+    } catch (error) {
+        console.error('Error cleaning up chat files:', error);
+        return res.status(500).json({ error: 'Failed to cleanup chat files' });
+    }
+});
+
+app.post('/api/ai-chat-cleanup-global', async (req, res) => {
+    try {
+        const { inactivityTimeout } = req.body;
+        if (!inactivityTimeout || typeof inactivityTimeout !== 'number') {
+            return res.status(400).json({ error: 'Valid inactivity timeout is required' });
+        }
+
+        const chatHistoriesBaseDir = path.join(__dirname, 'db', 'chat_histories');
+        
+        if (!fs.existsSync(chatHistoriesBaseDir)) {
+            return res.json({ success: true, message: 'No chat histories directory found', deletedCount: 0 });
+        }
+
+        const currentTime = Date.now();
+        let totalDeletedCount = 0;
+        const userDirs = fs.readdirSync(chatHistoriesBaseDir, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+
+        for (const userDir of userDirs) {
+            const userDirPath = path.join(chatHistoriesBaseDir, userDir);
+            const files = fs.readdirSync(userDirPath);
+            for (const file of files) {
+                if (!file.endsWith('.json')) continue;
+                const filePath = path.join(userDirPath, file);
+                try {
+                    const fileContent = fs.readFileSync(filePath, 'utf-8');
+                    const chat = JSON.parse(fileContent);
+                    const timeSinceLastActivity = currentTime - (chat.lastActivity || chat.createdAt || chat.startTime || 0);
+                    if (timeSinceLastActivity >= inactivityTimeout) {
+                        fs.unlinkSync(filePath);
+                        totalDeletedCount++;
+                    }
+                } catch (error) {
+                    console.error(`Error processing chat file ${file}:`, error);
+                    try { fs.unlinkSync(filePath); totalDeletedCount++; } catch(e) {}
+                }
+            }
+        }
+
+        return res.json({ success: true, message: `Cleaned up ${totalDeletedCount} expired chat files globally`, deletedCount: totalDeletedCount });
+    } catch (error) {
+        console.error('Error cleaning up chat files globally:', error);
+        return res.status(500).json({ error: 'Failed to cleanup chat files' });
     }
 });
 

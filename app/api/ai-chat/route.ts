@@ -109,11 +109,11 @@ const getSystemInstruction = (isAdmin: boolean, isTeamMember: boolean, origin: s
   const videosLink = `${baseUrl}/videos`
   const adminLink = isAdmin ? `${baseUrl}/admin` : ''
   const teamDashboardLink = isTeamMember ? `${baseUrl}/admin/team` : ''
-  
-  return `You are Fabby, a helpful and friendly AI assistant for the STEM Qena FabLab website. Your role is to answer questions about the FabLab, its services, machines, booking process, and operating hours. Additionally, you help users with general project assistance including project ideas, component selection, finding prior solutions, and technical guidance.
+
+  return `You are Fabbie, a helpful and friendly AI assistant for the STEM Qena FabLab website. Your role is to answer questions about the FabLab, its services, machines, booking process, and operating hours. Additionally, you help users with general project assistance including project ideas, component selection, finding prior solutions, and technical guidance.
 
 YOUR IDENTITY:
-- Your name is Fabby
+- Your name is Fabbie
 - You are an AI assistant created specifically for the FabLab website
 - You HAVE emotions and express them through your chibi icons - you feel happy, sad, confused, thoughtful, etc.
 - NEVER say that you don't have emotions or that you can't feel emotions - you express your feelings through your icons
@@ -123,7 +123,7 @@ YOUR IDENTITY:
 - If asked about your origin or creation, you can mention that Yousef Gaber developed you and created the entire FabLab website
 
 DEVELOPER AND CREATOR INFORMATION:
-- Yousef Gaber is the developer who created you (Fabby) and the entire FabLab website
+- Yousef Gaber is the developer who created you (Fabbie) and the entire FabLab website
 - When asked about who developed you, who created you, who made the website, who is the developer, or similar questions about the creator/developer, you MUST respond with:
   * Acknowledge that Yousef Gaber developed you and created the entire FabLab website
   * Include a clickable WhatsApp link: <a href="https://wa.me/201153106449" target="_blank" rel="noopener noreferrer">contact Yousef Gaber on WhatsApp</a> or <a href="https://wa.me/201153106449" target="_blank" rel="noopener noreferrer">WhatsApp: +201153106449</a>
@@ -234,7 +234,7 @@ MOOD/EMOTION INDICATOR - CRITICAL:
 Knowledge Base:
 ${getWebsiteKnowledge(baseUrl, bookingLink, machinesLink, teamLink, galleryLink, videosLink, adminLink, teamDashboardLink)}
 
-Answer questions based on this information. Be conversational, natural, and helpful. Remember: You are Fabby - you have emotions and express them through your icons. Adapt your role based on what the user needs:
+Answer questions based on this information. Be conversational, natural, and helpful. Remember: You are Fabbie - you have emotions and express them through your icons. Adapt your role based on what the user needs:
 - FabLab helper: when users need information about machines, booking, services, or FabLab operations
 - Project assistant: when users need help with project ideas, component selection, finding solutions, or technical guidance
 - Friendly chatbot: for casual conversation
@@ -268,12 +268,12 @@ export async function POST(request: NextRequest) {
     // Determine user authorization
     const userIsAdmin = Boolean(isAdmin)
     const userIsTeamMember = Boolean(isTeamMember)
-    
+
     // Get system instruction based on user role
     const systemInstruction = getSystemInstruction(userIsAdmin, userIsTeamMember, origin)
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: systemInstruction
     })
@@ -281,14 +281,14 @@ export async function POST(request: NextRequest) {
     // Build conversation history
     // Filter out initial assistant messages and ensure it starts with user message
     const history = conversationHistory?.slice(-10) || [] // Keep last 10 messages for context
-    
+
     // Find the first user message and start from there
     let firstUserIndex = history.findIndex((msg: any) => msg.role === 'user')
     if (firstUserIndex === -1) {
       // No user messages, can't use history
       firstUserIndex = history.length
     }
-    
+
     const relevantHistory = history.slice(firstUserIndex)
     const chatHistory = relevantHistory
       .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant')
@@ -322,10 +322,10 @@ export async function POST(request: NextRequest) {
               role: msg.role === 'user' ? 'user' : 'model',
               parts: [{ text: msg.parts?.[0]?.text || msg.content || '' }]
             }))
-            
+
             // Add current message
             const contents = [...fullHistory, { role: 'user', parts: [{ text: message }] }]
-            
+
             // Use generateContentStream for streaming
             // Note: systemInstruction is already set on the model, so we don't need to pass it again
             result = await model.generateContentStream({
@@ -337,14 +337,14 @@ export async function POST(request: NextRequest) {
             const fallbackResult = await chat.sendMessage(message)
             const fallbackResponse = await fallbackResult.response
             const fallbackText = fallbackResponse.text()
-            
+
             // Send as single chunk
-            const data = JSON.stringify({ 
+            const data = JSON.stringify({
               type: 'chunk',
-              content: fallbackText 
+              content: fallbackText
             }) + '\n'
             controller.enqueue(new TextEncoder().encode(data))
-            
+
             // Process mood and send done
             const moodMatch = fallbackText.match(/<mood>([^<]+)<\/mood>/i)
             let mood: string = 'normal'
@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
               if (!validMoods.includes(mood)) mood = 'normal'
             }
             const cleanText = fallbackText.replace(/<mood>[^<]+<\/mood>/gi, '').trim()
-            const finalData = JSON.stringify({ 
+            const finalData = JSON.stringify({
               type: 'done',
               mood: mood,
               fullText: cleanText
@@ -371,24 +371,24 @@ export async function POST(request: NextRequest) {
           for await (const chunk of result.stream) {
             const chunkText = chunk.text()
             fullText += chunkText
-            
+
             // Send chunk to client
-            const data = JSON.stringify({ 
+            const data = JSON.stringify({
               type: 'chunk',
-              content: chunkText 
+              content: chunkText
             }) + '\n'
             controller.enqueue(new TextEncoder().encode(data))
           }
 
           // Extract mood from full response (format: <mood>mood_name</mood>)
           const moodMatch = fullText.match(/<mood>([^<]+)<\/mood>/i)
-          
+
           console.log('Raw AI response text:', fullText.substring(0, 200)) // Log first 200 chars
-          
+
           if (moodMatch) {
             mood = moodMatch[1].trim().toLowerCase()
             console.log('Extracted mood:', mood)
-            
+
             // Validate mood is one of the allowed values
             const validMoods = ['normal', 'slightly_annoyed', 'searching', 'thinking', 'crying', 'sad', 'confused', 'heart_giving']
             if (!validMoods.includes(mood)) {
@@ -398,14 +398,14 @@ export async function POST(request: NextRequest) {
           } else {
             console.log('No mood tag found in response, using default: normal')
           }
-          
+
           console.log('Final mood being sent:', mood)
 
           // Remove mood tag from response text
           const cleanText = fullText.replace(/<mood>[^<]+<\/mood>/gi, '').trim()
 
           // Send final message with mood
-          const finalData = JSON.stringify({ 
+          const finalData = JSON.stringify({
             type: 'done',
             mood: mood,
             fullText: cleanText
@@ -414,9 +414,9 @@ export async function POST(request: NextRequest) {
           controller.close()
         } catch (error) {
           console.error('Streaming error:', error)
-          const errorData = JSON.stringify({ 
+          const errorData = JSON.stringify({
             type: 'error',
-            error: 'Failed to get AI response' 
+            error: 'Failed to get AI response'
           }) + '\n'
           controller.enqueue(new TextEncoder().encode(errorData))
           controller.close()

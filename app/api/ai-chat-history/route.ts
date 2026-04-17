@@ -3,11 +3,11 @@ import fs from 'fs'
 import path from 'path'
 
 // Generate formatted text file from chat history
-function generateChatHistoryText(chatHistory: any, userInfo?: {email: string, username: string, phone: string, grade: string}): string {
+function generateChatHistoryText(chatHistory: any, userInfo?: { email: string, username: string, phone: string, grade: string }): string {
   let text = '='.repeat(60) + '\n'
   text += '  FabLab Chat History\n'
   text += '='.repeat(60) + '\n\n'
-  
+
   text += `Chat Name: ${chatHistory.chatName || 'Unknown'}\n`
   if (userInfo) {
     text += `User Email: ${userInfo.email || 'Unknown'}\n`
@@ -27,11 +27,11 @@ function generateChatHistoryText(chatHistory: any, userInfo?: {email: string, us
 
   const messages = chatHistory.messages || []
   messages.forEach((msg: any, index: number) => {
-    const role = msg.role === 'user' ? 'User' : 'Fabby'
+    const role = msg.role === 'user' ? 'User' : 'Fabbie'
     const timestamp = new Date(msg.timestamp || Date.now()).toLocaleString()
-    
+
     text += `[${timestamp}] ${role}:\n`
-    
+
     // Remove HTML tags and clean up content
     let content = msg.content || ''
     content = content
@@ -42,15 +42,15 @@ function generateChatHistoryText(chatHistory: any, userInfo?: {email: string, us
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .trim()
-    
+
     // Indent content
     const lines = content.split('\n')
     lines.forEach((line: string) => {
       text += `  ${line}\n`
     })
-    
+
     text += '\n'
-    
+
     // Add separator between messages
     if (index < messages.length - 1) {
       text += '-'.repeat(60) + '\n\n'
@@ -65,7 +65,7 @@ function generateChatHistoryText(chatHistory: any, userInfo?: {email: string, us
 }
 
 // Send chat history to Discord webhook with text file attachment
-async function sendChatHistoryToDiscord(chatHistory: any, userInfo?: {email: string, username: string, phone: string, grade: string}) {
+async function sendChatHistoryToDiscord(chatHistory: any, userInfo?: { email: string, username: string, phone: string, grade: string }) {
   const webhookUrl = process.env.DISCORD_WEBHOOK_CHAT_HISTORY || process.env.DISCORD_WEBHOOK_LOGIN
   if (!webhookUrl) {
     console.log('DISCORD_WEBHOOK_CHAT_HISTORY not configured, skipping chat history notification')
@@ -77,15 +77,15 @@ async function sendChatHistoryToDiscord(chatHistory: any, userInfo?: {email: str
     const messages = chatHistory.messages || []
     const messageCount = messages.length
     const duration = chatHistory.duration || 'Unknown'
-    
+
     // Generate formatted text file
     const textContent = generateChatHistoryText(chatHistory, userInfo)
     const textBuffer = Buffer.from(textContent, 'utf-8')
-    
+
     // Create multipart form data manually
     const boundary = `----WebKitFormBoundary${Date.now()}`
     const fileName = `chat-history-${chatHistory.chatId || Date.now()}.txt`
-    
+
     // Build description with user info
     let description = `**Chat:** ${chatName}\n`
     if (userInfo) {
@@ -100,10 +100,10 @@ async function sendChatHistoryToDiscord(chatHistory: any, userInfo?: {email: str
     description += `**Duration:** ${duration}\n`
     description += `**Started:** ${new Date(chatHistory.startTime || Date.now()).toLocaleString()}\n`
     description += `**Ended:** ${new Date(chatHistory.endTime || Date.now()).toLocaleString()}`
-    
+
     // Create embed message
     const embed = {
-      title: '💬 Chat History - Fabby',
+      title: '💬 Chat History - Fabbie',
       description: description,
       color: 0x3498db, // Blue
       footer: {
@@ -124,7 +124,7 @@ async function sendChatHistoryToDiscord(chatHistory: any, userInfo?: {email: str
     body += `\r\n--${boundary}\r\n`
     body += `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n`
     body += `Content-Type: text/plain\r\n\r\n`
-    
+
     const bodyBuffer = Buffer.concat([
       Buffer.from(body, 'utf8'),
       textBuffer,
@@ -157,15 +157,15 @@ async function sendChatHistoryToDiscord(chatHistory: any, userInfo?: {email: str
 function saveChatHistoryToDB(chatHistory: any, userEmail?: string) {
   try {
     const chatHistoriesDir = path.join(process.cwd(), 'db', 'chat_histories')
-    
+
     // Create directory if it doesn't exist
     if (!fs.existsSync(chatHistoriesDir)) {
       fs.mkdirSync(chatHistoriesDir, { recursive: true })
     }
-    
+
     // Generate unique ID if not provided
     const chatId = chatHistory.chatId || `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    
+
     // Create chat history entry
     const historyEntry = {
       id: chatId,
@@ -179,7 +179,7 @@ function saveChatHistoryToDB(chatHistory: any, userEmail?: string) {
       savedAt: new Date().toISOString(),
       messageCount: (chatHistory.messages || []).length
     }
-    
+
     // Save as individual file: db/chat_histories/{id}.json
     const filePath = path.join(chatHistoriesDir, `${chatId}.json`)
     fs.writeFileSync(filePath, JSON.stringify(historyEntry, null, 2), 'utf-8')
@@ -188,7 +188,7 @@ function saveChatHistoryToDB(chatHistory: any, userEmail?: string) {
     console.log('   Chat Name:', historyEntry.chatName)
     console.log('   Messages:', historyEntry.messageCount)
     console.log('   User:', userEmail || 'anonymous')
-    
+
     return true
   } catch (error) {
     console.error('Error saving chat history to database:', error)
@@ -214,10 +214,10 @@ export async function POST(request: NextRequest) {
       userEmail: userInfo?.email || 'anonymous',
       username: userInfo?.username || 'Unknown'
     })
-    
+
     // Note: Chat file is already deleted from database before this is called
     // This route only sends to Discord webhook
-    
+
     // Send to Discord with text file
     try {
       await sendChatHistoryToDiscord(chatHistory, userInfo)
@@ -230,8 +230,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'Chat history sent to Discord successfully',
       chatId: chatHistory.chatId
     })
