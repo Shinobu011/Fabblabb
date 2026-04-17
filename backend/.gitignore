@@ -1,0 +1,15 @@
+# Backend
+node_modules/
+.env
+logs/
+*.log
+
+# DB files (contain user data — back up separately)
+db/accounts.json
+db/bookings.json
+db/verifications.json
+db/chat_histories/
+
+# OS
+.DS_Store
+Thumbs.db

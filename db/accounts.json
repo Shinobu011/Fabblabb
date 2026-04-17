@@ -1,0 +1,31 @@
+{
+    "accounts": [
+        {
+            "email": "yousef.2323062@stemqena.moe.edu.eg",
+            "username": "Mohamed",
+            "password": "$2b$12$Jo9Vk9kHcIbPla6HD3COWevZI9CPpj1s0So2zrghgiSOSYDNuIwPW",
+            "grade": "G12",
+            "phone": "+201153106449",
+            "isStemQena": true,
+            "createdAt": "2025-10-31T12:11:48.463Z"
+        },
+        {
+            "email": "Amr.2323032@stemqena.moe.edu.eg",
+            "username": "Mohamed",
+            "password": "$2b$12$Jo9Vk9kHcIbPla6HD3COWevZI9CPpj1s0So2zrghgiSOSYDNuIwPW",
+            "grade": "G12",
+            "phone": "+201153106449",
+            "isStemQena": true,
+            "createdAt": "2025-10-31T12:11:48.463Z"
+        },
+        {
+            "email": "yousefgaber272008@gmail.com",
+            "username": "Yousef Gaber",
+            "password": "$2b$12$Jo9Vk9kHcIbPla6HD3COWevZI9CPpj1s0So2zrghgiSOSYDNuIwPW",
+            "grade": "G12",
+            "phone": "+201153106449",
+            "isStemQena": false,
+            "createdAt": "2025-10-31T12:18:51.135Z"
+        }
+    ]
+}

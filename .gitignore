@@ -1,0 +1,20 @@
+# Frontend (Next.js)
+node_modules/
+.next/
+.tmp/
+.env.local
+.env*.local
+
+# Logs
+logs/
+*.log
+
+# Build
+out/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend folder has its own .gitignore

@@ -1,0 +1,8 @@
+ده اخر واحسن نسحة للديتيكشن ااب بس هو بيعمل ديتيكشن وسيميوليشن بس
+
+
+ينقصه:
+- grid on screen
+- data calculating
+- data visualization
+- generating data storing files (json or excel)

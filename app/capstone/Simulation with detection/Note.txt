@@ -1,0 +1,22 @@
+1] at line 25:
+video_source = r"C:\Users\STEM\OneDrive\Desktop\Cap_projects\Videos\red_car_test(curved).mp4"
+
+
+You can change the video path to the new one
+
+Note: there is a (video) example with (cars_config.json) example in the folder to use
+
+
+2] at lines 106 - 112
+    
+    origin_x = w // 2
+    origin_y = h // 2
+
+    REAL_WIDTH_CM = 121.5
+    REAL_HEIGHT_CM = 151.5
+    scale_x = REAL_WIDTH_CM / w
+    scale_y = REAL_HEIGHT_CM / h
+
+if the origin point in the center so each (origin_x = w // 2, origin_y = h // 2) . If the origion is at (down-left corner) of the image so just make (origin_x = w, origin_y).
+
+You can rather adjust it as you want.

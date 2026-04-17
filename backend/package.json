@@ -1,0 +1,26 @@
+{
+  "name": "fablab-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop fablab-backend",
+    "pm2:restart": "pm2 restart fablab-backend",
+    "pm2:delete": "pm2 delete fablab-backend",
+    "pm2:logs": "pm2 logs fablab-backend"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.2",
+    "helmet": "^8.1.0",
+    "pdfkit": "^0.17.2",
+    "resend": "^4.0.0",
+    "st.db": "^7.2.10"
+  }
+}

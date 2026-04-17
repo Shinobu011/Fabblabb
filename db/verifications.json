@@ -1,0 +1,26 @@
+{
+    "codes": [
+        {
+            "email": "yousefgaber2792008@gmail.com",
+            "username": "Yosuef Mohamed Gaber",
+            "password": "Yousefgaber7292008@",
+            "grade": "G12",
+            "phone": "+201153106449",
+            "isStemQena": false,
+            "code": "209247",
+            "expiresAt": "2025-10-31T07:47:34.222Z",
+            "createdAt": "2025-10-31T07:37:34.222Z"
+        },
+        {
+            "email": "yousefdaily1@gmail.com",
+            "username": "Yousef",
+            "password": "dailyyousef6",
+            "grade": "G12",
+            "phone": "01153106449",
+            "isStemQena": false,
+            "code": "839025",
+            "expiresAt": "2025-11-02T09:44:52.306Z",
+            "createdAt": "2025-11-02T09:34:52.306Z"
+        }
+    ]
+}
