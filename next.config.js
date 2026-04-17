@@ -20,7 +20,7 @@ const nextConfig = {
     return [
       {
         source: '/api/bookings-schedule',
-        destination: 'https://api.fablabqena.com/api/bookings-schedule',
+        destination: '/api/schedule',
         permanent: false,
       },
     ];
