@@ -668,12 +668,12 @@ function getBookingCountForSlot(date: string, time: string, bookings: any[]): { 
     const bDate = String(booking.date).trim();
     const bTime = String(booking.time).trim().toLowerCase();
     
-    // Match date: literal match (e.g., 2026-04-19)
-    const dateMatch = bDate === targetDate;
+    // Match date: literal match or startsWith (to handle partial timestamps/spaces)
+    const dateMatch = bDate === targetDate || bDate.startsWith(targetDate) || targetDate.startsWith(bDate);
     
     // Match time: allow 09:00 AM to match 9:00 AM
-    // We remove leading zeros for comparison
-    const normalizeTime = (t: string) => t.replace(/^0/, '');
+    // We remove leading zeros and remove all spaces for comparison
+    const normalizeTime = (t: string) => t.replace(/^0/, '').replace(/\s+/g, '').toLowerCase();
     const timeMatch = normalizeTime(bTime) === normalizeTime(targetTime);
     
     return dateMatch && timeMatch;
