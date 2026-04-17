@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     // For now, we'll handle JSON generation on the server
     // Since PyQt5 can't run in Node.js, we'll process the data directly
     if (action === 'generate_json') {
-      const output = { cars: [] }
+      const output: { cars: any[] } = { cars: [] }
       
       for (const car of data.paths || []) {
         const ctrlPx = [car.start_px, ...car.turn_points, car.end_px]
