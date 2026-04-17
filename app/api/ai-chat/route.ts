@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${hackClubApiKey}`,
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5-mini',
+        model: 'qwen/qwen3-235b-a22b',
         messages,
         stream: true,
       }),
