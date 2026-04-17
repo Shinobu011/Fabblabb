@@ -49,17 +49,18 @@ export async function GET(request: NextRequest) {
 
 // Generate HTML schedule that can be printed to PDF
 async function generateHTMLSchedule() {
-  // Read booking data
-  const bookingsPath = path.join(process.cwd(), 'db', 'bookings.json')
+  // Read booking data from the separated backend
   let bookings: any[] = []
   
   try {
-    if (fs.existsSync(bookingsPath)) {
-      const bookingsData = JSON.parse(fs.readFileSync(bookingsPath, 'utf8'))
-      bookings = bookingsData.bookings || []
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://api.fablabqena.com'
+    const res = await fetch(`${apiBase}/api/public/bookings`, { cache: 'no-store' })
+    if (res.ok) {
+        const bookingsData = await res.json()
+        bookings = bookingsData.bookings || []
     }
   } catch (error) {
-    console.error('Error reading bookings:', error)
+    console.error('Error fetching bookings from backend:', error)
   }
 
   // Generate schedule data - use current date in Egypt timezone (EET UTC+2)
