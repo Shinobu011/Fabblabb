@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const runtime = 'edge'
 export const preferredRegion = 'auto'
@@ -256,15 +255,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const apiKey = process.env.GOOGLE_GEMINI_API_KEY
-    if (!apiKey) {
-      console.error('GOOGLE_GEMINI_API_KEY is not set')
-      return NextResponse.json(
-        { error: 'AI service is not configured' },
-        { status: 500 }
-      )
-    }
-
     // Get origin from request headers
     const origin = request.headers.get('origin') || request.headers.get('referer')?.split('/').slice(0, 3).join('/') || process.env.ORIGIN || ''
 
@@ -275,159 +265,101 @@ export async function POST(request: NextRequest) {
     // Get system instruction based on user role
     const systemInstruction = getSystemInstruction(userIsAdmin, userIsTeamMember, origin)
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: systemInstruction
+    // Build messages array (OpenAI format)
+    const history = conversationHistory?.slice(-10) || []
+    const messages: { role: string; content: string }[] = [
+      { role: 'system', content: systemInstruction },
+      ...history
+        .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant')
+        .map((msg: { role: string; content: string }) => ({
+          role: msg.role,
+          content: msg.content
+        })),
+      { role: 'user', content: message }
+    ]
+
+    // Call Hack Club AI (OpenAI-compatible)
+    const hackClubResponse = await fetch('https://ai.hackclub.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini',
+        messages,
+        stream: true,
+      }),
     })
 
-    // Build conversation history
-    // Filter out initial assistant messages and ensure it starts with user message
-    const history = conversationHistory?.slice(-10) || [] // Keep last 10 messages for context
-
-    // Find the first user message and start from there
-    let firstUserIndex = history.findIndex((msg: any) => msg.role === 'user')
-    if (firstUserIndex === -1) {
-      // No user messages, can't use history
-      firstUserIndex = history.length
+    if (!hackClubResponse.ok) {
+      const err = await hackClubResponse.text().catch(() => 'Unknown error')
+      return NextResponse.json(
+        { error: `AI service error: ${hackClubResponse.status} ${err}` },
+        { status: 500 }
+      )
     }
 
-    const relevantHistory = history.slice(firstUserIndex)
-    const chatHistory = relevantHistory
-      .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant')
-      .map((msg: { role: string, content: string }) => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
-      }))
-      // Ensure it starts with user message (remove leading model messages)
-      .reduce((acc: any[], msg: any) => {
-        if (acc.length === 0 && msg.role !== 'user') {
-          return acc // Skip leading model messages
-        }
-        acc.push(msg)
-        return acc
-      }, [])
+    if (!hackClubResponse.body) {
+      return NextResponse.json({ error: 'No response body from AI' }, { status: 500 })
+    }
 
-    // Create a ReadableStream for streaming the response
+    // Transform the OpenAI SSE stream into our custom JSON stream format
     const stream = new ReadableStream({
       async start(controller) {
+        const encoder = new TextEncoder()
+        const decoder = new TextDecoder()
+        const reader = hackClubResponse.body!.getReader()
+
+        let fullText = ''
+        let mood = 'normal'
+
+        const enqueue = (obj: object) => {
+          controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
+        }
+
         try {
-          // Start chat with history if available and valid
-          const chat = model.startChat({
-            history: chatHistory.length > 0 && chatHistory[0].role === 'user' ? chatHistory : undefined,
-          })
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
 
-          // Use generateContentStream for streaming with full conversation history
-          let result
-          try {
-            // Build full conversation history for streaming
-            const fullHistory = chatHistory.map((msg: any) => ({
-              role: msg.role === 'user' ? 'user' : 'model',
-              parts: [{ text: msg.parts?.[0]?.text || msg.content || '' }]
-            }))
+            const raw = decoder.decode(value, { stream: true })
+            const lines = raw.split('\n').filter(l => l.startsWith('data: '))
 
-            // Add current message
-            const contents = [...fullHistory, { role: 'user', parts: [{ text: message }] }]
+            for (const line of lines) {
+              const data = line.slice(6).trim()
+              if (data === '[DONE]') continue
 
-            // Use generateContentStream for streaming
-            // Note: systemInstruction is already set on the model, so we don't need to pass it again
-            result = await model.generateContentStream({
-              contents: contents
-            })
-          } catch (streamError) {
-            // If streaming fails, try regular sendMessage as fallback
-            console.warn('Streaming method failed, using fallback:', streamError)
-            const fallbackResult = await chat.sendMessage(message)
-            const fallbackResponse = await fallbackResult.response
-            const fallbackText = fallbackResponse.text()
+              try {
+                const parsed = JSON.parse(data)
+                const delta = parsed.choices?.[0]?.delta?.content || ''
+                if (!delta) continue
 
-            // Send as single chunk
-            const data = JSON.stringify({
-              type: 'chunk',
-              content: fallbackText
-            }) + '\n'
-            controller.enqueue(new TextEncoder().encode(data))
-
-            // Process mood and send done
-            const moodMatch = fallbackText.match(/<mood>([^<]+)<\/mood>/i)
-            let mood: string = 'normal'
-            if (moodMatch) {
-              mood = moodMatch[1].trim().toLowerCase()
-              const validMoods = ['normal', 'slightly_annoyed', 'searching', 'thinking', 'crying', 'sad', 'confused', 'heart_giving']
-              if (!validMoods.includes(mood)) mood = 'normal'
+                fullText += delta
+                enqueue({ type: 'chunk', content: delta })
+              } catch {
+                // skip malformed chunks
+              }
             }
-            const cleanText = fallbackText.replace(/<mood>[^<]+<\/mood>/gi, '').trim()
-            const finalData = JSON.stringify({
-              type: 'done',
-              mood: mood,
-              fullText: cleanText
-            }) + '\n'
-            controller.enqueue(new TextEncoder().encode(finalData))
-            controller.close()
-            return
           }
 
-          let fullText = ''
-          let mood: string = 'normal' // default mood
-
-          // Stream chunks as they arrive
-          for await (const chunk of result.stream) {
-            const chunkText = chunk.text()
-            fullText += chunkText
-
-            // Send chunk to client
-            const data = JSON.stringify({
-              type: 'chunk',
-              content: chunkText
-            }) + '\n'
-            controller.enqueue(new TextEncoder().encode(data))
-          }
-
-          // Extract mood from full response (format: <mood>mood_name</mood>)
+          // Extract mood tag from final text
           const moodMatch = fullText.match(/<mood>([^<]+)<\/mood>/i)
-
-          console.log('Raw AI response text:', fullText.substring(0, 200)) // Log first 200 chars
-
           if (moodMatch) {
             mood = moodMatch[1].trim().toLowerCase()
-            console.log('Extracted mood:', mood)
-
-            // Validate mood is one of the allowed values
             const validMoods = ['normal', 'slightly_annoyed', 'searching', 'thinking', 'crying', 'sad', 'confused', 'heart_giving']
-            if (!validMoods.includes(mood)) {
-              console.log('Invalid mood, defaulting to normal:', mood)
-              mood = 'normal'
-            }
-          } else {
-            console.log('No mood tag found in response, using default: normal')
+            if (!validMoods.includes(mood)) mood = 'normal'
           }
 
-          console.log('Final mood being sent:', mood)
-
-          // Remove mood tag from response text
           const cleanText = fullText.replace(/<mood>[^<]+<\/mood>/gi, '').trim()
-
-          // Send final message with mood
-          const finalData = JSON.stringify({
-            type: 'done',
-            mood: mood,
-            fullText: cleanText
-          }) + '\n'
-          controller.enqueue(new TextEncoder().encode(finalData))
+          enqueue({ type: 'done', mood, fullText: cleanText })
           controller.close()
         } catch (error) {
-          console.error('Streaming error:', error)
-          const errorData = JSON.stringify({
-            type: 'error',
-            error: error instanceof Error ? error.message : 'Failed to get AI response'
-          }) + '\n'
-          controller.enqueue(new TextEncoder().encode(errorData))
+          enqueue({ type: 'error', error: error instanceof Error ? error.message : 'Stream error' })
           controller.close()
         }
       }
     })
 
-    // Return streaming response
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -436,7 +368,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Gemini API error:', error)
+    console.error('AI chat error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to get AI response' },
       { status: 500 }

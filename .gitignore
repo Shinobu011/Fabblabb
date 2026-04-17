@@ -17,4 +17,6 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Backend folder has its own .gitignore
+# Security
+.env
+scratch/
