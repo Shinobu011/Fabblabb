@@ -509,7 +509,8 @@ async function generateHTMLSchedule() {
         `).join('')}
         
         <div class="footer">
-            <p><strong>System Status:</strong> Bookings Found in Database: ${totalBookingsLoaded}</p>
+            <p><strong>System Status:</strong> Bookings Found: ${totalBookingsLoaded}</p>
+            ${totalBookingsLoaded > 0 ? `<p style="font-size: 10px; color: #94a3b8;">Debug Data 1: [${bookings[0].date}] at [${bookings[0].time}] status: [${bookings[0].status}]</p>` : ''}
             <p>This schedule is automatically updated in real-time whenever a booking is approved or rejected</p>
             <p>For questions or issues, contact the FabLab administration</p>
         </div>
@@ -656,12 +657,27 @@ function formatTime(hour24: number): string {
 
 // Get booking count and group numbers for a specific date and time slot
 function getBookingCountForSlot(date: string, time: string, bookings: any[]): { count: number, groupNumbers: string[] } {
+  // Normalize search parameters
+  const targetDate = date.trim();
+  const targetTime = time.trim().toLowerCase();
+  
   // Get approved bookings for this slot
-  const slotBookings = bookings.filter((booking: any) => 
-    booking.date === date && 
-    booking.time === time && 
-    booking.status === 'approved'
-  )
+  const slotBookings = bookings.filter((booking: any) => {
+    if (!booking.date || !booking.time || booking.status !== 'approved') return false;
+    
+    const bDate = String(booking.date).trim();
+    const bTime = String(booking.time).trim().toLowerCase();
+    
+    // Match date: literal match (e.g., 2026-04-19)
+    const dateMatch = bDate === targetDate;
+    
+    // Match time: allow 09:00 AM to match 9:00 AM
+    // We remove leading zeros for comparison
+    const normalizeTime = (t: string) => t.replace(/^0/, '');
+    const timeMatch = normalizeTime(bTime) === normalizeTime(targetTime);
+    
+    return dateMatch && timeMatch;
+  })
   
   const groupNumbers = slotBookings
     .map((booking: any) => booking.groupNumber)
