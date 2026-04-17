@@ -279,10 +279,12 @@ export async function POST(request: NextRequest) {
     ]
 
     // Call Hack Club AI (OpenAI-compatible)
-    const hackClubResponse = await fetch('https://ai.hackclub.com/chat/completions', {
+    const hackClubApiKey = process.env.HACKCLUB_AI_KEY || ''
+    const hackClubResponse = await fetch('https://ai.hackclub.com/proxy/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${hackClubApiKey}`,
       },
       body: JSON.stringify({
         model: 'openai/gpt-4o-mini',
