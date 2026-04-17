@@ -416,7 +416,7 @@ export async function POST(request: NextRequest) {
           console.error('Streaming error:', error)
           const errorData = JSON.stringify({
             type: 'error',
-            error: 'Failed to get AI response'
+            error: error instanceof Error ? error.message : 'Failed to get AI response'
           }) + '\n'
           controller.enqueue(new TextEncoder().encode(errorData))
           controller.close()
@@ -435,7 +435,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Gemini API error:', error)
     return NextResponse.json(
-      { error: 'Failed to get AI response' },
+      { error: error instanceof Error ? error.message : 'Failed to get AI response' },
       { status: 500 }
     )
   }
