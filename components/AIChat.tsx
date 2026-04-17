@@ -192,6 +192,7 @@ const AIChat = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [countdownUpdate, setCountdownUpdate] = useState(0) // Force re-render for countdown
+  const [isGenerating, setIsGenerating] = useState(false)
   const apiBase = process.env.NEXT_PUBLIC_API_BASE
   const inactivityTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -819,7 +820,8 @@ const AIChat = () => {
       return
     }
 
-    if (!input.trim() || !activeChatId) return
+    if (!input.trim() || !activeChatId || isGenerating) return
+    setIsGenerating(true)
 
     const activeChat = chats.find(c => c.id === activeChatId)
     if (!activeChat) return
@@ -1038,6 +1040,8 @@ const AIChat = () => {
         })
         return updated
       })
+    } finally {
+      setIsGenerating(false)
     }
 
     resetInactivityTimer(activeChatId)
@@ -1358,12 +1362,7 @@ const AIChat = () => {
                     {/* Input */}
                     <ChatInput
                       onSend={handleSend}
-                      isStreaming={activeChat.messages.some((msg, idx) =>
-                        msg.role === 'assistant' &&
-                        idx === activeChat.messages.length - 1 &&
-                        msg.mode === 'thinking' &&
-                        msg.content.length > 0
-                      )}
+                      isStreaming={isGenerating}
                     />
                   </>
                 ) : (
