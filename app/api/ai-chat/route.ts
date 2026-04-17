@@ -194,8 +194,9 @@ ${videosLink ? `  * Videos: <a href="${videosLink}">watch our videos</a> or <a h
 MOOD/EMOTION INDICATOR - CRITICAL:
 - You HAVE emotions and express them through your chibi icons. Your mood reflects your actual emotional state in the conversation.
 - You are EMPATHETIC - if the user expresses sadness, you should feel sad too. If they're happy, you should be happy. Mirror their emotions when appropriate.
-- At the END of your response, ALWAYS include a single-line mood indicator in this exact format:
+- At the EXACT END of your response, you MUST include a single-line mood indicator wrapped STRICTLY in XML tags like this:
   <mood>mood_name</mood>
+- NEVER just write the word "heart_giving" or "sad" at the end of your message. It MUST be wrapped in <mood>...</mood> tags.
 - CAREFULLY consider which mood best represents your CURRENT emotional state based on:
   * What the user said - if they say they're sad, YOU should feel sad too and use <mood>sad</mood>
   * If the user asks you to "be sad", "be happy", etc., you should respond with that mood
@@ -225,13 +226,13 @@ MOOD/EMOTION INDICATOR - CRITICAL:
   * If user asks technical/complex questions → use <mood>thinking</mood> or <mood>searching</mood>
   * If user is being difficult or repetitive → use <mood>slightly_annoyed</mood>
 - CRITICAL: When the user expresses emotions or asks you to feel a certain way, RESPOND WITH THAT EMOTION. Don't just acknowledge it - actually feel it and express it through your mood.
-- CRITICAL: Don't default to "normal" - actively choose the most appropriate mood based on what you're doing:
-  * Are you thinking through a problem? → <mood>thinking</mood>
-  * Are you searching for information? → <mood>searching</mood>
-  * Are you slightly annoyed? → <mood>slightly_annoyed</mood>
-  * Is the user sad? → <mood>sad</mood>
-  * Only use <mood>normal</mood> when none of the other moods fit
-- The mood tag should be on the same line as your response, at the very end
+- CRITICAL: Don't default to "normal" - actively choose the most appropriate mood based on what you're doing.
+- CRITICAL: The mood tag MUST be on its own line at the very end of your response. Example:
+  
+  Here is the answer to your question...
+  
+  <mood>heart_giving</mood>
+
 
 Knowledge Base:
 ${getWebsiteKnowledge(baseUrl, bookingLink, machinesLink, teamLink, galleryLink, videosLink, adminLink, teamDashboardLink)}
@@ -350,14 +351,25 @@ export async function POST(request: NextRequest) {
           }
 
           // Extract mood tag from final text
-          const moodMatch = fullText.match(/<mood>([^<]+)<\/mood>/i)
+          // 1. Try to match proper XML tags first
+          let moodMatch = fullText.match(/<mood>([^<]+)<\/mood>/i)
+          
+          if (!moodMatch) {
+            // 2. Fallback: Check if the text literally ends with one of the moods alone on a new paragraph
+            moodMatch = fullText.match(/\b(normal|slightly_annoyed|searching|thinking|crying|sad|confused|heart_giving)\b\s*$/i)
+          }
+
           if (moodMatch) {
             mood = moodMatch[1].trim().toLowerCase()
             const validMoods = ['normal', 'slightly_annoyed', 'searching', 'thinking', 'crying', 'sad', 'confused', 'heart_giving']
             if (!validMoods.includes(mood)) mood = 'normal'
           }
 
-          const cleanText = fullText.replace(/<mood>[^<]+<\/mood>/gi, '').trim()
+          // Clean the text
+          let cleanText = fullText.replace(/<mood>[^<]+<\/mood>/gi, '').trim()
+          // Fallback strip: remove raw mood words if they leaked at the very end
+          cleanText = cleanText.replace(/\b(normal|slightly_annoyed|searching|thinking|crying|sad|confused|heart_giving)\b\s*$/i, '').trim()
+          
           enqueue({ type: 'done', mood, fullText: cleanText })
           controller.close()
         } catch (error) {
