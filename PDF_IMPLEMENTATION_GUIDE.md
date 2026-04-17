@@ -144,4 +144,4 @@ To test the implementation:
 3. Visit `/admin` or `/admin/team`
 4. Click "Bookings Schedule"
 5. Verify the PDF loads with correct booking data
-6. Test download and fullscreen features
+6. Test download and fullscreen featuresؤخةةش
