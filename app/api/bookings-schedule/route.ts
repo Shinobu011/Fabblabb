@@ -55,7 +55,9 @@ async function generateHTMLSchedule() {
   
   try {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://api.fablabqena.com'
-    const res = await fetch(`${apiBase}/api/public/bookings`, { 
+    // Add a unique timestamp to force Cloudflare/Vercel to fetch fresh data every time
+    const timestamp = Date.now();
+    const res = await fetch(`${apiBase}/api/public/bookings?cb=${timestamp}`, { 
         cache: 'no-store',
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -72,6 +74,8 @@ async function generateHTMLSchedule() {
     console.error('Error fetching bookings from backend:', error)
     fetchError = error instanceof Error ? error.message : String(error)
   }
+
+  const totalBookingsLoaded = bookings.length;
 
   // Generate schedule data - use current date in Egypt timezone (EET UTC+2)
   const now = new Date()
@@ -505,6 +509,7 @@ async function generateHTMLSchedule() {
         `).join('')}
         
         <div class="footer">
+            <p><strong>System Status:</strong> Bookings Found in Database: ${totalBookingsLoaded}</p>
             <p>This schedule is automatically updated in real-time whenever a booking is approved or rejected</p>
             <p>For questions or issues, contact the FabLab administration</p>
         </div>
