@@ -990,6 +990,26 @@ const AIChat = () => {
           }
         }
       }
+      
+      // Safety check: Ensure the last message is no longer in "thinking" mode if the stream ended
+      setChats(prev => {
+        const updated = prev.map(chat => {
+          if (chat.id === activeChatId) {
+            const messages = [...chat.messages]
+            const lastMessage = messages[messages.length - 1]
+            if (lastMessage && lastMessage.role === 'assistant' && lastMessage.mode === 'thinking') {
+              messages[messages.length - 1] = {
+                ...lastMessage,
+                mode: finalMood || 'normal'
+              }
+            }
+            return { ...chat, messages }
+          }
+          return chat
+        })
+        return updated
+      })
+
     } catch (error) {
       console.error('Chat error:', error)
       const errorMessage: ChatMessage = {

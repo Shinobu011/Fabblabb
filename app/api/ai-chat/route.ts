@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
+export const runtime = 'edge'
+export const preferredRegion = 'auto'
+
 // Website knowledge base - all information about the FabLab
 const getWebsiteKnowledge = (baseUrl: string, bookingLink: string, machinesLink: string, teamLink: string, galleryLink: string, videosLink: string, adminLink: string, teamDashboardLink: string) => `
 STEM Qena FabLab - Complete Information
