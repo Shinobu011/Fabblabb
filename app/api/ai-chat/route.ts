@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${hackClubApiKey}`,
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
+        model: 'openai/gpt-5-mini',
         messages,
         stream: true,
       }),
