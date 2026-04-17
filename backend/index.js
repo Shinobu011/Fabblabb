@@ -2626,6 +2626,16 @@ app.post('/api/ai-chat-cleanup', async (req, res) => {
         const files = fs.readdirSync(chatHistoriesDir);
         let deletedCount = 0;
 
+        // Get accounts for user info lookup
+        const accounts = await accountsDb.get('accounts') || [];
+        const account = accounts.find(acc => acc.email === userEmail);
+        const userInfo = account ? {
+            email: account.email,
+            username: account.username || 'Unknown',
+            phone: account.phone || 'Not provided',
+            grade: account.grade || 'Unknown'
+        } : null;
+
         for (const file of files) {
             if (!file.endsWith('.json')) continue;
             const filePath = path.join(chatHistoriesDir, file);
@@ -2634,6 +2644,17 @@ app.post('/api/ai-chat-cleanup', async (req, res) => {
                 const chat = JSON.parse(fileContent);
                 const timeSinceLastActivity = currentTime - (chat.lastActivity || chat.createdAt || chat.startTime || 0);
                 if (timeSinceLastActivity >= inactivityTimeout) {
+                    // Send to Discord before deleting
+                    const chatHistory = {
+                        chatId: chat.id || chat.chatId || file.replace('.json', ''),
+                        chatName: chat.name || chat.chatName || 'Untitled Chat',
+                        messages: chat.messages || [],
+                        startTime: chat.startTime || chat.createdAt || Date.now(),
+                        endTime: currentTime,
+                        duration: chat.duration || `${Math.floor((currentTime - (chat.startTime || chat.createdAt || currentTime)) / 60000)}m ${Math.floor(((currentTime - (chat.startTime || chat.createdAt || currentTime)) % 60000) / 1000)}s`
+                    };
+                    await sendChatHistoryToDiscord(chatHistory, userInfo);
+                    
                     fs.unlinkSync(filePath);
                     deletedCount++;
                 }
