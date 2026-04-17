@@ -16,6 +16,15 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com', 'via.placeholder.com', 'img.youtube.com'],
   },
+  async redirects() {
+    return [
+      {
+        source: '/api/bookings-schedule',
+        destination: 'https://api.fablabqena.com/api/bookings-schedule',
+        permanent: false,
+      },
+    ];
+  },
 }
 
 module.exports = nextConfig
