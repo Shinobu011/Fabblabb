@@ -51,16 +51,26 @@ export async function GET(request: NextRequest) {
 async function generateHTMLSchedule() {
   // Read booking data from the separated backend
   let bookings: any[] = []
+  let fetchError = null;
   
   try {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'https://api.fablabqena.com'
-    const res = await fetch(`${apiBase}/api/public/bookings`, { cache: 'no-store' })
+    const res = await fetch(`${apiBase}/api/public/bookings`, { 
+        cache: 'no-store',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+        }
+    })
     if (res.ok) {
         const bookingsData = await res.json()
         bookings = bookingsData.bookings || []
+    } else {
+        fetchError = `API Error: ${res.status} ${res.statusText}`
     }
   } catch (error) {
     console.error('Error fetching bookings from backend:', error)
+    fetchError = error instanceof Error ? error.message : String(error)
   }
 
   // Generate schedule data - use current date in Egypt timezone (EET UTC+2)
@@ -440,6 +450,7 @@ async function generateHTMLSchedule() {
             <div class="meta">
                 <p>📅 Generated: ${generatedDate} at ${generatedTime}</p>
                 <p>🔄 Updates in real-time with each booking approval/rejection</p>
+                ${fetchError ? `<p style="color: #ffcccc; font-weight: bold; margin-top: 10px;">⚠️ Connection Error: ${fetchError}</p>` : ''}
             </div>
         </div>
         
