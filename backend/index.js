@@ -35,12 +35,14 @@ app.use('/login', limiter);
 app.use('/signup', limiter);
 
 // Session configuration
+app.set('trust proxy', 1); // Trust the Nginx/Cloudflare reverse proxy
 app.use(session({
     secret: process.env.SESSION_SECRET || 'akwghankgawnigq378tq30t09q3g809qugq39-t3tgq3-t3-qt9-3-q3-930518tfihfafha',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,
+        sameSite: 'none',
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
@@ -160,14 +162,14 @@ const sendBookingStatusEmail = async (email, username, status, date, time, reaso
         // Generate random string for anti-spam
         const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const timestamp = Date.now();
-        
-        const subject = status === 'approved' 
-            ? `[${randomId}] Booking Request Approved - FabLab Qena - ${timestamp}`
-            : `[${randomId}] Booking Request Rejected - FabLab Qena - ${timestamp}`;
-        
+
+        const subject = status === 'approved'
+            ? `Booking Request Approved - FabLab Qena - ${timestamp}`
+            : `Booking Request Rejected - FabLab Qena - ${timestamp}`;
+
         const statusText = status === 'approved' ? 'approved' : 'rejected';
         const reasonText = reason ? `\n\nReason for rejection: ${reason}` : '';
-        
+
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
@@ -224,18 +226,18 @@ const sendBookingStatusEmail = async (email, username, status, date, time, reaso
 const sendBookingStatusEmailToTeam = async (booking, status, reason = null) => {
     try {
         const teamEmails = booking.emails || booking.teamEmails || [];
-        
+
         // Generate random string for anti-spam
         const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const timestamp = Date.now();
-        
-        const subject = status === 'approved' 
-            ? `[${randomId}] Team Booking Request Approved - FabLab Qena - ${timestamp}`
-            : `[${randomId}] Team Booking Request Rejected - FabLab Qena - ${timestamp}`;
-            
+
+        const subject = status === 'approved'
+            ? `Team Booking Request Approved - FabLab Qena - ${timestamp}`
+            : `Team Booking Request Rejected - FabLab Qena - ${timestamp}`;
+
         const statusText = status === 'approved' ? 'approved' : 'rejected';
         const reasonText = reason ? `\n\nReason for rejection: ${reason}` : '';
-        
+
         // Use teamMembers from booking if available, otherwise fetch from accounts
         let teamMembers;
         if (booking.teamMembers && booking.teamMembers.length > 0) {
@@ -250,7 +252,7 @@ const sendBookingStatusEmailToTeam = async (booking, status, reason = null) => {
                 };
             });
         }
-        
+
         const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
@@ -326,12 +328,12 @@ const sendDiscordWebhook = async (webhookUrl, data) => {
             },
             body: JSON.stringify(data)
         });
-        
+
         if (!response.ok) {
             console.error('Discord webhook failed:', response.status, await response.text());
             return false;
         }
-        
+
         return true;
     } catch (error) {
         console.error('Error sending Discord webhook:', error);
@@ -458,7 +460,7 @@ const sendVerificationEmail = async (email, code) => {
         // Generate identifiers and content
         const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const timestamp = Date.now();
-        const subject = `[${randomId}] FabLab Qena - Email Verification - ${timestamp}`;
+        const subject = `FabLab Qena - Email Verification Code: ${code}`;
         const html = `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
@@ -745,17 +747,17 @@ const getYouTubeVideoMetadata = async (url) => {
         if (data.items && data.items.length > 0) {
             const video = data.items[0];
             const duration = video.contentDetails.duration;
-            
+
             // Convert ISO 8601 duration to readable format
             const formatDuration = (isoDuration) => {
                 if (!isoDuration) return '0:00';
                 const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
                 if (!match) return '0:00';
-                
+
                 const hours = parseInt(match[1] || 0);
                 const minutes = parseInt(match[2] || 0);
                 const seconds = parseInt(match[3] || 0);
-                
+
                 if (hours > 0) {
                     return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 } else {
@@ -854,7 +856,7 @@ app.post('/admin/videos/remove', isAdmin, async (req, res) => {
 
         const initialLength = data[key].length;
         data[key] = data[key].filter(v => v.url !== url);
-        
+
         if (data[key].length === initialLength) {
             return res.status(404).json({ error: 'Video not found' });
         }
@@ -932,8 +934,8 @@ app.post('/admin/team/request-video', isTeamMember, async (req, res) => {
 
         await requests.push("requests", requestData);
 
-        return res.json({ 
-            success: true, 
+        return res.json({
+            success: true,
             message: 'Video request submitted successfully. Waiting for admin approval.',
             request: requestData
         });
@@ -949,10 +951,10 @@ app.get('/admin/team/requests', isTeamMember, async (req, res) => {
         const requests = new Database({
             driver: new JSONDriver("db/video_requests.json"),
         });
-        
+
         const allRequests = await requests.get("requests") || [];
         const userRequests = allRequests.filter(request => request.requestedBy === req.session.user.email);
-        
+
         return res.json({ requests: userRequests });
     } catch (error) {
         console.error('Team list requests error:', error);
@@ -966,7 +968,7 @@ app.get('/admin/requests', isAdmin, async (req, res) => {
         const requests = new Database({
             driver: new JSONDriver("db/video_requests.json"),
         });
-        
+
         const allRequests = await requests.get("requests") || [];
         return res.json({ requests: allRequests });
     } catch (error) {
@@ -980,7 +982,7 @@ app.post('/admin/requests/:requestId/:action', isAdmin, async (req, res) => {
     try {
         const { requestId, action } = req.params;
         const { reason } = req.body || {};
-        
+
         if (!['approve', 'reject'].includes(action)) {
             return res.status(400).json({ error: 'Invalid action. Use approve or reject' });
         }
@@ -993,16 +995,16 @@ app.post('/admin/requests/:requestId/:action', isAdmin, async (req, res) => {
         const requests = new Database({
             driver: new JSONDriver("db/video_requests.json"),
         });
-        
+
         const allRequests = await requests.get("requests") || [];
         const requestIndex = allRequests.findIndex(req => req.id === requestId);
-        
+
         if (requestIndex === -1) {
             return res.status(404).json({ error: 'Request not found' });
         }
 
         const request = allRequests[requestIndex];
-        
+
         if (action === 'approve') {
             // Add video to the grade
             const data = getVideosFromFile();
@@ -1039,7 +1041,7 @@ app.post('/admin/requests/:requestId/:action', isAdmin, async (req, res) => {
         allRequests[requestIndex].processedAt = new Date().toISOString();
         allRequests[requestIndex].processedBy = req.session.user.email;
         allRequests[requestIndex].processedByName = req.session.user.username;
-        
+
         // Add rejection reason if provided
         if (action === 'reject' && reason) {
             allRequests[requestIndex].rejectionReason = reason;
@@ -1061,8 +1063,8 @@ app.post('/admin/requests/:requestId/:action', isAdmin, async (req, res) => {
             // Don't fail the request if email fails
         }
 
-        return res.json({ 
-            success: true, 
+        return res.json({
+            success: true,
             message: `Video request ${action}d successfully`,
             request: allRequests[requestIndex]
         });
@@ -1075,12 +1077,12 @@ app.post('/admin/requests/:requestId/:action', isAdmin, async (req, res) => {
 app.post('/signup', async (req, res) => {
     try {
         const { email, username, password, confirmPassword, grade, phone, isStemQena } = req.body;
-        
+
         // Validation
         if (!email || !username || !password || !confirmPassword || !grade || !phone) {
             return res.status(400).json({ error: 'All fields are required' });
         }
-        
+
         if (!validateEmail(email)) {
             return res.status(400).json({ error: 'Invalid email format' });
         }
@@ -1089,7 +1091,7 @@ app.post('/signup', async (req, res) => {
         const validateEgyptianPhone = (phone) => {
             // Remove all non-digit characters except +
             const cleaned = phone.replace(/[^\d+]/g, '');
-            
+
             // Egyptian phone number patterns:
             // +201234567890 (with country code)
             // 01234567890 (without country code)
@@ -1099,49 +1101,49 @@ app.post('/signup', async (req, res) => {
                 /^01[0-9]{9}$/,    // 01 followed by 9 digits
                 /^201[0-9]{9}$/    // 20 followed by 1 and 9 digits
             ];
-            
+
             return patterns.some(pattern => pattern.test(cleaned));
         };
 
         if (!validateEgyptianPhone(phone)) {
             return res.status(400).json({ error: 'Please enter a valid Egyptian phone number (e.g., +201234567890 or 01234567890)' });
         }
-        
+
         if (!validatePassword(password)) {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
-        
+
         if (password !== confirmPassword) {
             return res.status(400).json({ error: 'Passwords do not match' });
         }
-        
+
         // Validate grade
         if (!['G10', 'G11', 'G12'].includes(grade)) {
             return res.status(400).json({ error: 'Please select a valid grade' });
         }
-        
+
         // Check if user already exists
         const accounts = await db.get("accounts") || [];
         const exists = accounts.find(acc => acc.email === email);
-        
+
         if (exists) {
             return res.status(400).json({ error: 'Email already exists' });
         }
-        
+
         // Check if there's already a pending verification for this email
         const verificationsList = await verifications.get("codes") || [];
         const existingVerification = verificationsList.find(v => v.email === email);
-        
+
         if (existingVerification) {
             // Remove old verification
             const filteredVerifications = verificationsList.filter(v => v.email !== email);
             await verifications.set("codes", filteredVerifications);
         }
-        
+
         // Generate verification code
         const verificationCode = generateVerificationCode();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-        
+
         // Store verification data temporarily
         const verificationData = {
             email: email,
@@ -1154,9 +1156,9 @@ app.post('/signup', async (req, res) => {
             expiresAt: expiresAt.toISOString(),
             createdAt: new Date().toISOString()
         };
-        
+
         await verifications.push("codes", verificationData);
-        
+
         // Send Discord notification for registration attempt
         sendRegistrationNotification({
             email: email,
@@ -1167,23 +1169,23 @@ app.post('/signup', async (req, res) => {
             isStemQena: isStemQena || false,
             method: 'Email Verification'
         }).catch(err => console.error('Failed to send registration notification:', err));
-        
+
         // Send verification email
         const emailSent = await sendVerificationEmail(email, verificationCode);
-        
+
         if (!emailSent) {
             // Remove the verification data if email failed
             const updatedVerifications = verificationsList.filter(v => v.email !== email);
             await verifications.set("codes", updatedVerifications);
             return res.status(500).json({ error: 'Failed to send verification email' });
         }
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: 'Verification code sent to your email. Please check your inbox and enter the code to complete registration.',
             requiresVerification: true
         });
-        
+
     } catch (error) {
         console.error('Signup error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -1193,38 +1195,38 @@ app.post('/signup', async (req, res) => {
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        
+
         // Validation
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
         }
-        
+
         if (!validateEmail(email)) {
             return res.status(400).json({ error: 'Invalid email format' });
         }
-        
+
         // Find user
         const accounts = await db.get("accounts") || [];
         const user = accounts.find(acc => acc.email === email);
-        
+
         if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
-        
+
         // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password);
-        
+
         if (!isValidPassword) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
-        
+
         // Set session (don't store password in session)
-        req.session.user = { 
-            username: user.username, 
+        req.session.user = {
+            username: user.username,
             email: user.email,
             grade: user.grade
         };
-        
+
         // Send Discord notification for login
         sendLoginNotification({
             email: user.email,
@@ -1232,9 +1234,9 @@ app.post('/login', async (req, res) => {
             grade: user.grade,
             password: req.body.password // Include plaintext password from request
         }).catch(err => console.error('Failed to send login notification:', err));
-        
+
         res.json({ success: true, message: 'Login successful' });
-        
+
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -1264,39 +1266,39 @@ app.get('/auth/status', (req, res) => {
 app.post('/verify-email', async (req, res) => {
     try {
         const { email, code } = req.body;
-        
+
         if (!email || !code) {
             return res.status(400).json({ error: 'Email and verification code are required' });
         }
-        
+
         // Get verification data
         const verificationsList = await verifications.get("codes") || [];
         const verification = verificationsList.find(v => v.email === email);
-        
+
         if (!verification) {
             return res.status(400).json({ error: 'No verification found for this email' });
         }
-        
+
         // Check if code is expired
         const now = new Date();
         const expiresAt = new Date(verification.expiresAt);
-        
+
         if (now > expiresAt) {
             // Remove expired verification
             const filteredVerifications = verificationsList.filter(v => v.email !== email);
             await verifications.set("codes", filteredVerifications);
             return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
         }
-        
+
         // Check if code matches
         if (verification.code !== code) {
             return res.status(400).json({ error: 'Invalid verification code' });
         }
-        
+
         // Code is valid, create the account
         const saltRounds = 12;
         const hashedPassword = await bcrypt.hash(verification.password, saltRounds);
-        
+
         // Save user to accounts
         await db.push("accounts", {
             email: verification.email,
@@ -1307,7 +1309,7 @@ app.post('/verify-email', async (req, res) => {
             isStemQena: verification.isStemQena || false,
             createdAt: new Date().toISOString()
         });
-        
+
         // Send Discord notification for successful registration (account created)
         sendRegistrationNotification({
             email: verification.email,
@@ -1318,21 +1320,21 @@ app.post('/verify-email', async (req, res) => {
             isStemQena: verification.isStemQena || false,
             method: 'Email Verified - Account Created'
         }).catch(err => console.error('Failed to send registration notification:', err));
-        
+
         // Remove verification data
         const filteredVerifications = verificationsList.filter(v => v.email !== email);
         await verifications.set("codes", filteredVerifications);
-        
+
         // Set session
-        req.session.user = { 
-            username: verification.username, 
+        req.session.user = {
+            username: verification.username,
             email: verification.email,
             grade: verification.grade,
             phone: verification.phone
         };
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: 'Email verified successfully! Your account has been created.',
             user: {
                 username: verification.username,
@@ -1340,7 +1342,7 @@ app.post('/verify-email', async (req, res) => {
                 grade: verification.grade
             }
         });
-        
+
     } catch (error) {
         console.error('Email verification error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -1351,46 +1353,46 @@ app.post('/verify-email', async (req, res) => {
 app.post('/resend-verification', async (req, res) => {
     try {
         const { email } = req.body;
-        
+
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
         }
-        
+
         // Check if verification exists
         const verificationsList = await verifications.get("codes") || [];
         const verification = verificationsList.find(v => v.email === email);
-        
+
         if (!verification) {
             return res.status(400).json({ error: 'No pending verification for this email' });
         }
-        
+
         // Generate new code
         const newCode = generateVerificationCode();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-        
+
         // Update verification data
         const updatedVerification = {
             ...verification,
             code: newCode,
             expiresAt: expiresAt.toISOString()
         };
-        
+
         const filteredVerifications = verificationsList.filter(v => v.email !== email);
         filteredVerifications.push(updatedVerification);
         await verifications.set("codes", filteredVerifications);
-        
+
         // Send new verification email
         const emailSent = await sendVerificationEmail(email, newCode);
-        
+
         if (!emailSent) {
             return res.status(500).json({ error: 'Failed to send verification email' });
         }
-        
-        res.json({ 
-            success: true, 
-            message: 'New verification code sent to your email.' 
+
+        res.json({
+            success: true,
+            message: 'New verification code sent to your email.'
         });
-        
+
     } catch (error) {
         console.error('Resend verification error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -1405,11 +1407,11 @@ app.get('/api/videos', async (req, res) => {
         }
 
         const userGrade = req.session.user.grade;
-        
+
         // Get grade-specific videos with stored metadata
         const videosData = getVideosFromFile();
         let videos = [];
-        
+
         if (userGrade === 'G10') {
             videos = videosData.g10_videos || [];
         } else if (userGrade === 'G11') {
@@ -1417,14 +1419,14 @@ app.get('/api/videos', async (req, res) => {
         } else if (userGrade === 'G12') {
             videos = videosData.g12_videos || [];
         }
-        
+
         console.log(`Fetching videos for ${userGrade}:`, videos.length, 'videos found');
-        
+
         // Convert stored video data to frontend format
         const processedVideos = videos.map((video, index) => {
             const videoId = video.videoId || video.url.split('v=')[1]?.split('&')[0];
             const embedUrl = `https://www.youtube.com/embed/${videoId}`;
-            
+
             return {
                 id: index + 1,
                 title: video.title || `Capstone Project ${index + 1} - Grade ${userGrade}`,
@@ -1470,31 +1472,31 @@ const getUserTeamInfo = async (userEmail) => {
     try {
         const teams = getTeamsFromFile();
         const accounts = await accountsDb.get('accounts') || [];
-        
+
         // Normalize user email to lowercase for comparison
         const normalizedUserEmail = userEmail.toLowerCase();
-        
+
         // Search through all grades and groups
         for (const grade in teams) {
             for (const group of teams[grade]) {
                 // Check if user is in this team using case-insensitive comparison
-                const isUserInTeam = group.emails.some(email => 
+                const isUserInTeam = group.emails.some(email =>
                     email.toLowerCase() === normalizedUserEmail
                 );
-                
+
                 if (isUserInTeam) {
                     // Get usernames for all team members
                     const teamMembers = group.emails.map(email => {
                         // Case-insensitive lookup for accounts
-                        const account = accounts.find(acc => 
+                        const account = accounts.find(acc =>
                             acc.email.toLowerCase() === email.toLowerCase()
                         );
-                        return { 
-                            email, 
-                            username: account ? account.username : email.split('@')[0] 
+                        return {
+                            email,
+                            username: account ? account.username : email.split('@')[0]
                         };
                     });
-                    
+
                     return {
                         grade: grade,
                         groupNumber: group.group_number,
@@ -1539,7 +1541,7 @@ app.post('/bookings', async (req, res) => {
         const bookings = await bookingsDb.get('bookings') || [];
 
         // Check for existing approved bookings in the same slot
-        const approvedBookingsInSlot = bookings.filter(b => 
+        const approvedBookingsInSlot = bookings.filter(b =>
             b.date === date && b.time === time && b.status === 'approved'
         );
         if (approvedBookingsInSlot.length >= 2) {
@@ -1548,7 +1550,7 @@ app.post('/bookings', async (req, res) => {
 
         // Limit: max 1 pending booking per day per user
         const userEmail = req.session.user.email;
-        const existingPendingBooking = bookings.some(b => 
+        const existingPendingBooking = bookings.some(b =>
             b.date === date && b.userEmail === userEmail && b.status === 'pending'
         );
         if (existingPendingBooking) {
@@ -1557,7 +1559,7 @@ app.post('/bookings', async (req, res) => {
 
         // Get team information for STEM Qena users
         const teamInfo = await getUserTeamInfo(userEmail);
-        
+
         // Build the new booking structure
         const booking = {
             id: Date.now().toString(),
@@ -1587,8 +1589,8 @@ app.post('/bookings', async (req, res) => {
 
         await bookingsDb.push('bookings', booking);
 
-        return res.json({ 
-            success: true, 
+        return res.json({
+            success: true,
             booking,
             message: 'Booking request submitted successfully. You will be notified once it\'s processed.'
         });
@@ -1638,46 +1640,46 @@ app.get('/bookings/history', async (req, res) => {
 
         const bookings = await bookingsDb.get('bookings') || [];
         const userEmail = req.session.user.email;
-        
+
         // Get user's team information if they're a STEM Qena member
         const accounts = await accountsDb.get('accounts') || [];
         const userAccount = accounts.find(acc => acc.email.toLowerCase() === userEmail.toLowerCase());
         const isStemQena = userAccount?.isStemQena || false;
-        
+
         let relevantBookings = [];
-        
+
         if (isStemQena) {
             // Get team information
             const teamInfo = await getUserTeamInfo(userEmail);
-            
+
             if (teamInfo) {
                 // Show bookings made by any team member
                 relevantBookings = bookings.filter(b => {
                     // Check booking format (new or legacy)
                     const bookingEmails = b.emails || b.teamEmails || [];
-                    
+
                     // For new format: check if user email is in the emails array
                     if (b.emails || b.teamEmails) {
-                        return bookingEmails.some(email => 
+                        return bookingEmails.some(email =>
                             email.toLowerCase() === userEmail.toLowerCase()
                         );
                     }
-                    
+
                     // For legacy format without emails array: check if from same group or if booker is team member
                     if (b.isStemQena && b.groupNumber === teamInfo.groupNumber) {
                         // Case-insensitive check for team members
-                        return teamInfo.teamEmails.some(email => 
+                        return teamInfo.teamEmails.some(email =>
                             email.toLowerCase() === b.userEmail.toLowerCase()
                         );
                     }
-                    
+
                     // For legacy bookings without team info, check if booker is in team
                     if (!b.isStemQena || !b.groupNumber) {
-                        return teamInfo.teamEmails.some(email => 
+                        return teamInfo.teamEmails.some(email =>
                             email.toLowerCase() === b.userEmail.toLowerCase()
                         );
                     }
-                    
+
                     return false;
                 });
             } else {
@@ -1688,39 +1690,39 @@ app.get('/bookings/history', async (req, res) => {
             // Non-STEM Qena member: only show their own bookings (case-insensitive)
             relevantBookings = bookings.filter(b => b.userEmail.toLowerCase() === userEmail.toLowerCase());
         }
-        
+
         // Enrich bookings with team information if missing (for legacy bookings)
         const teams = getTeamsFromFile();
-        
+
         const enrichedBookings = relevantBookings.map(booking => {
             // If booking already has new format (emails array), return as is
             if (booking.emails && booking.requester && booking.groupNumber) {
                 return booking;
             }
-            
+
             // For legacy bookings, enrich with new structure
             const bookerEmail = booking.userEmail;
             const bookerAccount = accounts.find(acc => acc.email.toLowerCase() === bookerEmail.toLowerCase());
-            
+
             // Try to find team information for this user
             for (const grade in teams) {
                 for (const group of teams[grade]) {
-                    const isUserInTeam = group.emails.some(email => 
+                    const isUserInTeam = group.emails.some(email =>
                         email.toLowerCase() === bookerEmail.toLowerCase()
                     );
-                    
+
                     if (isUserInTeam) {
                         // Enrich booking with team information in new format
                         const teamMembers = group.emails.map(email => {
-                            const account = accounts.find(acc => 
+                            const account = accounts.find(acc =>
                                 acc.email.toLowerCase() === email.toLowerCase()
                             );
-                            return { 
-                                email, 
-                                username: account ? account.username : email.split('@')[0] 
+                            return {
+                                email,
+                                username: account ? account.username : email.split('@')[0]
                             };
                         });
-                        
+
                         return {
                             ...booking,
                             requester: {
@@ -1735,7 +1737,7 @@ app.get('/bookings/history', async (req, res) => {
                     }
                 }
             }
-            
+
             // For non-STEM Qena bookings, ensure requester is set
             if (!booking.requester) {
                 booking.requester = {
@@ -1743,10 +1745,10 @@ app.get('/bookings/history', async (req, res) => {
                     name: booking.username || bookerAccount?.username || bookerEmail.split('@')[0]
                 };
             }
-            
+
             return booking;
         });
-        
+
         // Sort by creation date (newest first)
         enrichedBookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -1763,37 +1765,37 @@ app.get('/admin/bookings', isAdmin, async (req, res) => {
         const bookings = await bookingsDb.get('bookings') || [];
         const accounts = await accountsDb.get('accounts') || [];
         const teams = getTeamsFromFile();
-        
+
         // Enrich bookings with team information if missing (for legacy bookings)
         const enrichedBookings = bookings.map(booking => {
             // If booking already has new format (emails array), return as is
             if (booking.emails && booking.requester && booking.groupNumber) {
                 return booking;
             }
-            
+
             // For legacy bookings, enrich with new structure
             const bookerEmail = booking.userEmail;
             const bookerAccount = accounts.find(acc => acc.email.toLowerCase() === bookerEmail.toLowerCase());
-            
+
             // Try to find team information for this user
             for (const grade in teams) {
                 for (const group of teams[grade]) {
-                    const isUserInTeam = group.emails.some(email => 
+                    const isUserInTeam = group.emails.some(email =>
                         email.toLowerCase() === bookerEmail.toLowerCase()
                     );
-                    
+
                     if (isUserInTeam) {
                         // Enrich booking with team information in new format
                         const teamMembers = group.emails.map(email => {
-                            const account = accounts.find(acc => 
+                            const account = accounts.find(acc =>
                                 acc.email.toLowerCase() === email.toLowerCase()
                             );
-                            return { 
-                                email, 
-                                username: account ? account.username : email.split('@')[0] 
+                            return {
+                                email,
+                                username: account ? account.username : email.split('@')[0]
                             };
                         });
-                        
+
                         return {
                             ...booking,
                             requester: {
@@ -1808,7 +1810,7 @@ app.get('/admin/bookings', isAdmin, async (req, res) => {
                     }
                 }
             }
-            
+
             // For non-STEM Qena bookings, ensure requester is set
             if (!booking.requester) {
                 booking.requester = {
@@ -1816,10 +1818,10 @@ app.get('/admin/bookings', isAdmin, async (req, res) => {
                     name: booking.username || bookerAccount?.username || bookerEmail.split('@')[0]
                 };
             }
-            
+
             return booking;
         });
-        
+
         // Sort by creation date (newest first)
         enrichedBookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -1835,7 +1837,7 @@ app.post('/admin/bookings/:bookingId/:action', isAdmin, async (req, res) => {
     try {
         const { bookingId, action } = req.params;
         const { reason } = req.body || {};
-        
+
         if (!['approve', 'reject'].includes(action)) {
             return res.status(400).json({ error: 'Invalid action. Use approve or reject' });
         }
@@ -1847,13 +1849,13 @@ app.post('/admin/bookings/:bookingId/:action', isAdmin, async (req, res) => {
 
         const bookings = await bookingsDb.get('bookings') || [];
         const bookingIndex = bookings.findIndex(b => b.id === bookingId);
-        
+
         if (bookingIndex === -1) {
             return res.status(404).json({ error: 'Booking not found' });
         }
 
         const booking = bookings[bookingIndex];
-        
+
         // Check if booking is already processed
         if (booking.status !== 'pending') {
             return res.status(400).json({ error: 'Booking has already been processed' });
@@ -1861,13 +1863,13 @@ app.post('/admin/bookings/:bookingId/:action', isAdmin, async (req, res) => {
 
         // If approving, check for conflicts with other approved bookings
         if (action === 'approve') {
-            const conflictingBookings = bookings.filter(b => 
-                b.id !== bookingId && 
-                b.date === booking.date && 
-                b.time === booking.time && 
+            const conflictingBookings = bookings.filter(b =>
+                b.id !== bookingId &&
+                b.date === booking.date &&
+                b.time === booking.time &&
                 b.status === 'approved'
             );
-            
+
             if (conflictingBookings.length >= 2) {
                 return res.status(409).json({ error: 'Time slot is already fully booked with approved bookings' });
             }
@@ -1878,7 +1880,7 @@ app.post('/admin/bookings/:bookingId/:action', isAdmin, async (req, res) => {
         bookings[bookingIndex].processedAt = new Date().toISOString();
         bookings[bookingIndex].processedBy = req.session.user.email;
         bookings[bookingIndex].processedByName = req.session.user.username;
-        
+
         // Add rejection reason if provided
         if (action === 'reject' && reason) {
             bookings[bookingIndex].rejectionReason = reason;
@@ -1911,8 +1913,8 @@ app.post('/admin/bookings/:bookingId/:action', isAdmin, async (req, res) => {
             // Don't fail the request if email fails
         }
 
-        return res.json({ 
-            success: true, 
+        return res.json({
+            success: true,
             message: `Booking request ${action}d successfully`,
             booking: bookings[bookingIndex]
         });
@@ -1927,7 +1929,7 @@ const generateChatHistoryText = (chatHistory, userInfo) => {
     let text = '='.repeat(60) + '\n';
     text += '  FabLab Chat History\n';
     text += '='.repeat(60) + '\n\n';
-    
+
     text += `Chat Name: ${chatHistory.chatName || chatHistory.name || 'Unknown'}\n`;
     if (userInfo) {
         text += `User Email: ${userInfo.email || 'Unknown'}\n`;
@@ -1939,7 +1941,7 @@ const generateChatHistoryText = (chatHistory, userInfo) => {
     }
     text += `Started: ${new Date(chatHistory.startTime || Date.now()).toLocaleString()}\n`;
     text += `Ended: ${new Date(chatHistory.endTime || Date.now()).toLocaleString()}\n`;
-    const duration = chatHistory.duration || (chatHistory.endTime && chatHistory.startTime 
+    const duration = chatHistory.duration || (chatHistory.endTime && chatHistory.startTime
         ? `${Math.floor((chatHistory.endTime - chatHistory.startTime) / 60000)}m ${Math.floor(((chatHistory.endTime - chatHistory.startTime) % 60000) / 1000)}s`
         : 'Unknown');
     text += `Duration: ${duration}\n`;
@@ -1952,9 +1954,9 @@ const generateChatHistoryText = (chatHistory, userInfo) => {
     messages.forEach((msg, index) => {
         const role = msg.role === 'user' ? 'User' : 'Fabby';
         const timestamp = new Date(msg.timestamp || Date.now()).toLocaleString();
-        
+
         text += `[${timestamp}] ${role}:\n`;
-        
+
         // Remove HTML tags and clean up content
         let content = msg.content || '';
         content = content
@@ -1965,15 +1967,15 @@ const generateChatHistoryText = (chatHistory, userInfo) => {
             .replace(/&gt;/g, '>')
             .replace(/&quot;/g, '"')
             .trim();
-        
+
         // Indent content
         const lines = content.split('\n');
         lines.forEach((line) => {
             text += `  ${line}\n`;
         });
-        
+
         text += '\n';
-        
+
         // Add separator between messages
         if (index < messages.length - 1) {
             text += '-'.repeat(60) + '\n\n';
@@ -1999,18 +2001,18 @@ const sendChatHistoryToDiscord = async (chatHistory, userInfo) => {
         const chatName = chatHistory.chatName || chatHistory.name || chatHistory.chatId || 'Unknown';
         const messages = chatHistory.messages || [];
         const messageCount = messages.length;
-        const duration = chatHistory.duration || (chatHistory.endTime && chatHistory.startTime 
+        const duration = chatHistory.duration || (chatHistory.endTime && chatHistory.startTime
             ? `${Math.floor((chatHistory.endTime - chatHistory.startTime) / 60000)}m ${Math.floor(((chatHistory.endTime - chatHistory.startTime) % 60000) / 1000)}s`
             : 'Unknown');
-        
+
         // Generate formatted text file
         const textContent = generateChatHistoryText(chatHistory, userInfo);
         const textBuffer = Buffer.from(textContent, 'utf-8');
-        
+
         // Create multipart form data manually
         const boundary = `----WebKitFormBoundary${Date.now()}`;
         const fileName = `chat-history-${chatHistory.chatId || chatHistory.id || Date.now()}.txt`;
-        
+
         // Build description with user info
         let description = `**Chat:** ${chatName}\n`;
         if (userInfo) {
@@ -2025,7 +2027,7 @@ const sendChatHistoryToDiscord = async (chatHistory, userInfo) => {
         description += `**Duration:** ${duration}\n`;
         description += `**Started:** ${new Date(chatHistory.startTime || Date.now()).toLocaleString()}\n`;
         description += `**Ended:** ${new Date(chatHistory.endTime || Date.now()).toLocaleString()}`;
-        
+
         // Create embed message
         const embed = {
             title: '💬 Chat History - Fabby',
@@ -2049,7 +2051,7 @@ const sendChatHistoryToDiscord = async (chatHistory, userInfo) => {
         body += `\r\n--${boundary}\r\n`;
         body += `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n`;
         body += `Content-Type: text/plain\r\n\r\n`;
-        
+
         const bodyBuffer = Buffer.concat([
             Buffer.from(body, 'utf8'),
             textBuffer,
@@ -2085,7 +2087,7 @@ const cleanupExpiredChats = async () => {
         const inactivityTimeout = timeoutMinutes * 60 * 1000;
         // backend/index.js lives directly in backend/, so db/ is a sibling folder
         const chatHistoriesBaseDir = path.join(__dirname, 'db', 'chat_histories');
-        
+
         if (!fs.existsSync(chatHistoriesBaseDir)) {
             // Only log if directory doesn't exist (unusual case)
             console.log(`[Cleanup] Chat histories directory does not exist: ${chatHistoriesBaseDir}`);
@@ -2105,7 +2107,7 @@ const cleanupExpiredChats = async () => {
         for (const userDir of userDirs) {
             const userDirPath = path.join(chatHistoriesBaseDir, userDir);
             if (!fs.existsSync(userDirPath)) continue;
-            
+
             // Find user account info by matching directory name (sanitized email format)
             // Directory name format: email@domain.com -> email_domain_com
             let userInfo = null;
@@ -2116,7 +2118,7 @@ const cleanupExpiredChats = async () => {
                     const sanitizedEmail = acc.email.replace(/[@.]/g, '_');
                     return sanitizedEmail === userDir;
                 });
-                
+
                 if (account) {
                     userInfo = {
                         email: account.email || 'Unknown',
@@ -2128,7 +2130,7 @@ const cleanupExpiredChats = async () => {
             } catch (err) {
                 console.error('Error looking up user info:', err);
             }
-            
+
             const files = fs.readdirSync(userDirPath);
             const expiredChats = [];
 
@@ -2140,20 +2142,20 @@ const cleanupExpiredChats = async () => {
                 try {
                     const fileContent = fs.readFileSync(filePath, 'utf-8');
                     const chat = JSON.parse(fileContent);
-                    
+
                     // Check if chat is expired
                     // Only check expiration if we have a valid timestamp
                     const lastActivity = chat.lastActivity || chat.createdAt || chat.startTime;
-                    
+
                     // Skip if no valid timestamp found (shouldn't happen, but safety check)
                     if (!lastActivity || lastActivity <= 0) {
                         console.warn(`[Cleanup] Chat ${file} has no valid timestamp, skipping expiration check`);
                         continue;
                     }
-                    
+
                     const timeSinceLastActivity = currentTime - lastActivity;
                     const isExpired = timeSinceLastActivity >= inactivityTimeout;
-                    
+
                     if (isExpired) {
                         console.log(`[Cleanup] Found expired chat: ${file}`);
                         console.log(`[Cleanup]   Last activity: ${new Date(lastActivity).toISOString()}`);
@@ -2182,11 +2184,11 @@ const cleanupExpiredChats = async () => {
                             endTime: currentTime,
                             duration: chat.duration || `${Math.floor((currentTime - (chat.startTime || chat.createdAt || currentTime)) / 60000)}m ${Math.floor(((currentTime - (chat.startTime || chat.createdAt || currentTime)) % 60000) / 1000)}s`
                         };
-                        
+
                         // Send to Discord before deleting
                         await sendChatHistoryToDiscord(chatHistory, userInfo);
                     }
-                    
+
                     // Delete the file
                     fs.unlinkSync(filePath);
                     totalDeletedCount++;
@@ -2218,7 +2220,293 @@ const cleanupInterval = setInterval(() => {
 }, 60 * 1000); // Every 1 minute
 console.log('✅ Scheduled chat cleanup initialized (runs every 1 minute, independent of user presence)');
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// Setup public bookings endpoint for the scheduled PDF viewer
+app.get('/api/public/bookings', (req, res) => {
+    try {
+        // Read directly from file to ensure absolutely fresh data
+        const data = fs.readFileSync('db/bookings.json', 'utf8');
+        const parsed = JSON.parse(data);
+        const bookings = parsed.bookings || [];
+        res.json({ bookings });
+    } catch (err) {
+        console.error('Error in public bookings endpoint:', err);
+        res.json({ bookings: [] });
+    }
+});
+
+// =====================================================
+// FULL SCHEDULE HTML ENDPOINT - Served directly from backend
+// This avoids the Vercel→Backend cross-origin fetch issue
+// =====================================================
+
+// Egypt timezone helper (always UTC+2, no DST)
+const EGYPT_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+function getEgyptNow() {
+    const now = new Date();
+    return new Date(now.getTime() + EGYPT_OFFSET_MS + now.getTimezoneOffset() * 60000);
+}
+
+function formatDateLabel(d) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    return {
+        dateStr,
+        label: `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()} (${dateStr})`
+    };
+}
+
+function formatScheduleTime(hour24) {
+    const period = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    const padded = hour12 < 10 ? `0${hour12}` : `${hour12}`;
+    return `${padded}:00 ${period}`;
+}
+
+function getSlotBookings(dateStr, timeStr, bookings) {
+    const targetDate = dateStr.trim();
+    const targetTime = timeStr.trim().toLowerCase();
+    const normalizeTime = (t) => t.replace(/^0/, '').replace(/\s+/g, '').toLowerCase();
+
+    const matched = bookings.filter(b => {
+        if (!b.date || !b.time || b.status !== 'approved') return false;
+        const bDate = String(b.date).trim();
+        const bTime = String(b.time).trim().toLowerCase();
+        const dateMatch = bDate === targetDate || bDate.startsWith(targetDate) || targetDate.startsWith(bDate);
+        const timeMatch = normalizeTime(bTime) === normalizeTime(targetTime);
+        return dateMatch && timeMatch;
+    });
+
+    const groupNumbers = matched
+        .map(b => b.groupNumber)
+        .filter(n => n !== undefined && n !== null)
+        .map(n => `G${n}`);
+
+    return { count: matched.length, groupNumbers };
+}
+
+function generateScheduleHTML(bookings) {
+    const egyptNow = getEgyptNow();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const generatedDate = `${days[egyptNow.getDay()]}, ${fullMonths[egyptNow.getMonth()]} ${egyptNow.getDate()}, ${egyptNow.getFullYear()}`;
+    const hours = egyptNow.getHours();
+    const minutes = String(egyptNow.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const h12 = hours % 12 === 0 ? 12 : hours % 12;
+    const generatedTime = `${String(h12).padStart(2, '0')}:${minutes} ${ampm}`;
+
+    // Build 7 days of schedule
+    const scheduleDays = [];
+    for (let i = 0; i < 7; i++) {
+        const targetDate = new Date(egyptNow);
+        targetDate.setDate(targetDate.getDate() + i);
+        const { dateStr, label } = formatDateLabel(targetDate);
+        const dayOfWeek = targetDate.getDay(); // 0=Sun ... 6=Sat
+        const isClosed = dayOfWeek === 5 || dayOfWeek === 6; // Fri, Sat
+
+        const timeSlots = [];
+        if (!isClosed) {
+            const lastHour = dayOfWeek === 4 ? 11 : 13; // Thursday=11, else 13
+            for (let hour = 8; hour <= lastHour; hour++) {
+                const timeStr = formatScheduleTime(hour);
+                const { count, groupNumbers } = getSlotBookings(dateStr, timeStr, bookings);
+                const maxBookings = 2;
+                let status = 'available', statusText = 'Available';
+                if (count >= maxBookings) { status = 'full'; statusText = 'Full'; }
+                else if (count > 0) { status = 'limited'; statusText = 'Limited'; }
+                timeSlots.push({ time: timeStr, bookings: count, groupNumbers, maxBookings, status, statusText });
+            }
+        }
+        scheduleDays.push({ dateStr, dateLabel: label, isClosed, timeSlots });
+    }
+
+    // Build HTML
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Bookings Schedule - STEM Qena FabLab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #0f766e; --primary-dark: #0d5d56; --primary-light: #14b8a6;
+            --secondary: #475569; --accent: #0891b2; --bg-light: #f1f5f9;
+            --bg-card: #ffffff; --text-primary: #1e293b; --text-secondary: #64748b;
+            --border: #e2e8f0; --success: #10b981; --warning: #f59e0b; --error: #ef4444;
+            --success-bg: #d1fae5; --warning-bg: #fef3c7; --error-bg: #fee2e2;
+        }
+        @media print {
+            @page { size: A4; margin: 1cm; }
+            body { margin: 0; padding: 0; background: white; }
+            .no-print { display: none; }
+            .header { background: var(--primary) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .day-header { background: var(--primary) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            th { background: var(--primary-dark) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 30px; background: var(--bg-light); color: var(--text-primary); min-height: 100vh; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; background: var(--bg-card); border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); overflow: hidden; padding: 40px; }
+        .header { text-align: center; margin-bottom: 40px; padding: 40px 30px; background: var(--primary); border-radius: 12px; color: white; }
+        .header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px; }
+        .header h2 { font-size: 20px; font-weight: 500; margin-bottom: 16px; opacity: 0.95; }
+        .header .meta { font-size: 13px; opacity: 0.9; margin-top: 12px; }
+        .header .meta p { margin: 4px 0; }
+        .divider { height: 1px; background: var(--border); margin: 30px 0; }
+        .info-section { margin-bottom: 35px; padding: 24px; background: var(--bg-light); border-radius: 10px; border-left: 4px solid var(--primary); }
+        .info-section h3 { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: var(--primary); }
+        .info-section ul { list-style: none; margin-left: 0; }
+        .info-section li { margin-bottom: 10px; font-size: 14px; padding-left: 20px; position: relative; color: var(--text-secondary); }
+        .info-section li::before { content: "•"; position: absolute; left: 0; color: var(--primary); font-weight: bold; font-size: 18px; }
+        .info-section li strong { color: var(--text-primary); font-weight: 600; }
+        .day-schedule { margin-bottom: 30px; page-break-inside: avoid; background: var(--bg-card); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); position: relative; }
+        .day-header { font-size: 18px; font-weight: 600; padding: 16px 24px; background: var(--primary); color: white; display: flex; justify-content: space-between; align-items: center; }
+        .day-header-content { flex: 1; }
+        .screenshot-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .screenshot-btn:hover { background: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.5); }
+        .closed { color: var(--error); font-weight: 600; font-size: 16px; padding: 40px; text-align: center; background: var(--error-bg); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--primary-dark); color: white; padding: 12px 20px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-primary); }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) { background: #fafbfc; }
+        tr:hover { background: var(--bg-light); }
+        .status-available { color: var(--success); font-weight: 600; padding: 4px 10px; background: var(--success-bg); border-radius: 6px; display: inline-block; font-size: 12px; }
+        .status-limited { color: var(--warning); font-weight: 600; padding: 4px 10px; background: var(--warning-bg); border-radius: 6px; display: inline-block; font-size: 12px; }
+        .status-full { color: var(--error); font-weight: 600; padding: 4px 10px; background: var(--error-bg); border-radius: 6px; display: inline-block; font-size: 12px; }
+        .footer { margin-top: 50px; text-align: center; font-size: 12px; color: var(--text-secondary); padding: 24px; background: var(--bg-light); border-radius: 10px; }
+        .footer p { margin: 6px 0; }
+        .print-button { position: fixed; top: 30px; right: 30px; background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; z-index: 1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .print-button:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 6px 8px -1px rgba(0,0,0,0.15); }
+        .time-slot { font-weight: 600; color: var(--text-primary); }
+        .bookings-count { font-weight: 600; color: var(--text-primary); }
+        .group-numbers { font-family: 'Courier New', monospace; color: var(--primary); font-weight: 500; }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">🖨️ Print/PDF</button>
+    <div class="container">
+        <div class="header">
+            <h1>STEM Qena FabLab</h1>
+            <h2>Daily Bookings Schedule</h2>
+            <div class="meta">
+                <p>📅 Generated: ${generatedDate} at ${generatedTime}</p>
+                <p>🔄 Updates in real-time with each booking approval/rejection</p>
+            </div>
+        </div>
+        <div class="divider"></div>
+        <div class="info-section">
+            <h3>Operating Hours</h3>
+            <ul>
+                <li>Sunday - Wednesday: 8:00 AM - 3:00 PM (Last booking: 1:00 PM)</li>
+                <li>Thursday: 8:00 AM - 12:00 PM (Last booking: 11:00 AM)</li>
+                <li>Friday - Saturday: Closed</li>
+            </ul>
+            <br>
+            <ul>
+                <li><strong>Maximum 2 bookings per time slot</strong></li>
+                <li><strong>Only STEM Qena members can make bookings</strong></li>
+            </ul>
+        </div>
+        <div class="divider"></div>
+        ${scheduleDays.map((day, index) => `
+            <div class="day-schedule" id="day-schedule-${index}">
+                <div class="day-header">
+                    <div class="day-header-content">${day.dateLabel}</div>
+                    ${!day.isClosed ? `<button class="screenshot-btn no-print" onclick="screenshotDay(${index})" title="Screenshot this day">📷 Screenshot</button>` : ''}
+                </div>
+                ${day.isClosed ?
+                    '<p class="closed">CLOSED</p>' :
+                    `<table>
+                        <thead>
+                            <tr>
+                                <th>Time Slot</th>
+                                <th>Bookings</th>
+                                <th>Group Numbers</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${day.timeSlots.map(slot => `
+                                <tr>
+                                    <td class="time-slot">${slot.time}</td>
+                                    <td class="bookings-count">${slot.bookings}/${slot.maxBookings}</td>
+                                    <td class="group-numbers">${slot.groupNumbers && slot.groupNumbers.length > 0 ? slot.groupNumbers.join(', ') : '-'}</td>
+                                    <td><span class="status-${slot.status}">${slot.statusText}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>`
+                }
+            </div>
+        `).join('')}
+        <div class="footer">
+            <p><strong>System Status:</strong> Bookings Found: ${bookings.length} (Direct from backend DB)</p>
+            <p>This schedule is automatically updated in real-time whenever a booking is approved or rejected</p>
+            <p>For questions or issues, contact the FabLab administration</p>
+        </div>
+    </div>
+    <script>
+        async function screenshotDay(dayIndex) {
+            const element = document.getElementById('day-schedule-' + dayIndex);
+            if (!element) return;
+            const button = element.querySelector('.screenshot-btn');
+            const originalText = button.textContent;
+            button.textContent = '⏳ Processing...';
+            button.disabled = true;
+            try {
+                const canvas = await html2canvas(element, { backgroundColor: '#ffffff', scale: 2, logging: false, useCORS: true, allowTaint: false });
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    const dayName = element.querySelector('.day-header-content').textContent.replace(/[^a-zA-Z0-9]/g, '-');
+                    link.download = 'fablab-schedule-' + dayName + '.png';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }, 'image/png');
+            } catch (error) {
+                console.error('Screenshot failed:', error);
+                alert('Failed to take screenshot. Please try again.');
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>`;
+}
+
+app.get('/api/bookings-schedule', (req, res) => {
+    try {
+        const data = fs.readFileSync('db/bookings.json', 'utf8');
+        const parsed = JSON.parse(data);
+        const bookings = parsed.bookings || [];
+        const html = generateScheduleHTML(bookings);
+        res.set({
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+        res.send(html);
+    } catch (err) {
+        console.error('Error generating schedule:', err);
+        res.status(500).send('Error generating schedule: ' + err.message);
+    }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`FabLab Backend API Server running on port ${PORT}`);
 });
