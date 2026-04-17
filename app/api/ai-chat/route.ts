@@ -320,26 +320,31 @@ export async function POST(request: NextRequest) {
         }
 
         try {
+          let buffer = ''
           while (true) {
             const { done, value } = await reader.read()
             if (done) break
 
-            const raw = decoder.decode(value, { stream: true })
-            const lines = raw.split('\n').filter(l => l.startsWith('data: '))
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || '' // Keep the last partial line in the buffer
 
             for (const line of lines) {
-              const data = line.slice(6).trim()
+              const trimmedLine = line.trim()
+              if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue
+              
+              const data = trimmedLine.slice(6).trim()
               if (data === '[DONE]') continue
 
               try {
                 const parsed = JSON.parse(data)
                 const delta = parsed.choices?.[0]?.delta?.content || ''
-                if (!delta) continue
-
-                fullText += delta
-                enqueue({ type: 'chunk', content: delta })
-              } catch {
-                // skip malformed chunks
+                if (delta) {
+                  fullText += delta
+                  enqueue({ type: 'chunk', content: delta })
+                }
+              } catch (e) {
+                console.warn('Failed to parse SSE chunk:', data)
               }
             }
           }
