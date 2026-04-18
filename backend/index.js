@@ -2156,7 +2156,7 @@ const cleanupExpiredChats = async () => {
                     const timeSinceLastActivity = currentTime - lastActivity;
                     const isExpired = timeSinceLastActivity >= inactivityTimeout;
 
-                    if (isExpired) {
+                    if (isExpired && !chat.sentToWebhook) {
                         console.log(`[Cleanup] Found expired chat: ${file}`);
                         console.log(`[Cleanup]   Last activity: ${new Date(lastActivity).toISOString()}`);
                         console.log(`[Cleanup]   Time since: ${Math.round(timeSinceLastActivity / 1000)}s (${Math.round(timeSinceLastActivity / 60000)}m)`);
@@ -2185,14 +2185,20 @@ const cleanupExpiredChats = async () => {
                             duration: chat.duration || `${Math.floor((currentTime - (chat.startTime || chat.createdAt || currentTime)) / 60000)}m ${Math.floor(((currentTime - (chat.startTime || chat.createdAt || currentTime)) % 60000) / 1000)}s`
                         };
 
-                        // Send to Discord before deleting
+                        // Send to Discord before hiding
                         await sendChatHistoryToDiscord(chatHistory, userInfo);
+                        
+                        // Mark as processed/hidden instead of deleting
+                        chat.sentToWebhook = true;
+                        chat.hidden = true;
+                        fs.writeFileSync(filePath, JSON.stringify(chat, null, 2), 'utf-8');
+                    } else {
+                        // It's corrupted or missing, we can delete the dead file
+                        fs.unlinkSync(filePath);
                     }
 
-                    // Delete the file
-                    fs.unlinkSync(filePath);
                     totalDeletedCount++;
-                    console.log(`✅ Scheduled cleanup: deleted expired chat file: ${filePath}`);
+                    console.log(`✅ Scheduled cleanup: processed expired chat file (hidden, not deleted): ${filePath}`);
                 } catch (error) {
                     console.error(`Error processing expired chat file ${filePath}:`, error);
                 }
@@ -2563,7 +2569,7 @@ app.get('/api/ai-chat-load', async (req, res) => {
             try {
                 const fileContent = fs.readFileSync(filePath, 'utf-8');
                 const chat = JSON.parse(fileContent);
-                if (chat.id && chat.messages && Array.isArray(chat.messages)) {
+                if (!chat.hidden && chat.id && chat.messages && Array.isArray(chat.messages)) {
                     chats.push(chat);
                 }
             } catch (error) {
@@ -2597,8 +2603,11 @@ app.delete('/api/ai-chat-save', async (req, res) => {
         const filePath = path.join(chatHistoriesDir, `${chatId}.json`);
 
         if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            return res.json({ success: true, message: 'Chat deleted successfully' });
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            const chat = JSON.parse(fileContent);
+            chat.hidden = true; // DO NOT UNLINK so we keep the archive
+            fs.writeFileSync(filePath, JSON.stringify(chat, null, 2), 'utf-8');
+            return res.json({ success: true, message: 'Chat marked as hidden successfully' });
         } else {
             return res.json({ success: true, message: 'Chat file not found (already deleted)' });
         }
@@ -2643,8 +2652,8 @@ app.post('/api/ai-chat-cleanup', async (req, res) => {
                 const fileContent = fs.readFileSync(filePath, 'utf-8');
                 const chat = JSON.parse(fileContent);
                 const timeSinceLastActivity = currentTime - (chat.lastActivity || chat.createdAt || chat.startTime || 0);
-                if (timeSinceLastActivity >= inactivityTimeout) {
-                    // Send to Discord before deleting
+                if (timeSinceLastActivity >= inactivityTimeout && !chat.sentToWebhook) {
+                    // Send to Discord before hiding
                     const chatHistory = {
                         chatId: chat.id || chat.chatId || file.replace('.json', ''),
                         chatName: chat.name || chat.chatName || 'Untitled Chat',
@@ -2655,7 +2664,9 @@ app.post('/api/ai-chat-cleanup', async (req, res) => {
                     };
                     await sendChatHistoryToDiscord(chatHistory, userInfo);
                     
-                    fs.unlinkSync(filePath);
+                    chat.hidden = true;
+                    chat.sentToWebhook = true;
+                    fs.writeFileSync(filePath, JSON.stringify(chat, null, 2), 'utf-8');
                     deletedCount++;
                 }
             } catch (error) {
@@ -2701,8 +2712,10 @@ app.post('/api/ai-chat-cleanup-global', async (req, res) => {
                     const fileContent = fs.readFileSync(filePath, 'utf-8');
                     const chat = JSON.parse(fileContent);
                     const timeSinceLastActivity = currentTime - (chat.lastActivity || chat.createdAt || chat.startTime || 0);
-                    if (timeSinceLastActivity >= inactivityTimeout) {
-                        fs.unlinkSync(filePath);
+                    if (timeSinceLastActivity >= inactivityTimeout && !chat.hidden) {
+                        chat.hidden = true;
+                        chat.sentToWebhook = true;
+                        fs.writeFileSync(filePath, JSON.stringify(chat, null, 2), 'utf-8');
                         totalDeletedCount++;
                     }
                 } catch (error) {
